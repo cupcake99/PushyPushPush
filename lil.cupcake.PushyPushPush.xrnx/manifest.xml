@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RenoiseScriptingTool>
+  <ApiVersion>6</ApiVersion>
+  <AutoUpgraded>true</AutoUpgraded>
+  <Id>lil.cupcake.PushyPushPush</Id>
+  <Version>0.001</Version>
+  <Author>cupcake99</Author>
+  <Name>PushyPushPush</Name>
+  <Category>Utility</Category>
+  <Description>....</Description>
+</RenoiseScriptingTool>
