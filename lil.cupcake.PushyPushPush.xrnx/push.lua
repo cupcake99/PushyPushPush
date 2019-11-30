@@ -185,18 +185,29 @@ Push.control = {
 -- CC value for the various lighting modes of the button LEDs
 Push.button_light = {
     low = 1, 
-    low_slow_blink = 2, 
-    low_fast_blink = 3, 
     high = 4, 
-    high_slow_blink = 5, 
-    high_fast_blink = 6, 
     off = 0
 }
 
-Push.softkey_light = {}
+Push.noteval_light = {
+    dim_red = 1,
+    red = 4,
+    dim_orange = 7,
+    orange = 10,
+    dim_yellow = 13,
+    yellow = 16,
+    dark_green = 19,
+    light_green = 22,
+    off = 0
+}
 
-Push.noteval_light = {}
+-- add this to a button or noteval button light setting to get a blink
+Push.blink = {
+    slow = 1,
+    fast = 2
+}
 
+-- too many bloody colours to list here until the main programming is done
 Push.pad_light = {
     dark_grey = 1, 
     light_grey = 2, 
@@ -224,6 +235,28 @@ Push.pad_light = {
     off = 0
 }
 
+-- MIDI channel sets the pad lighting mode. fade goes from white to colour value. Saw oscillates in a saw wave. Square oscillates in 
+-- a square wave surprisingly. They are in order from fastest to slowest for each option respectively.
+Push.channel = {
+    on = 0,
+    fade_1 = 1,
+    fade_2 = 2,
+    fade_3 = 3,
+    fade_4 = 4,
+    fade_5 = 5,
+    saw_1 = 6,
+    saw_2 = 7,
+    saw_3 = 8,
+    saw_4 = 9,
+    saw_5 = 10,
+    square_1 = 11,
+    square_2 = 12,
+    square_3 = 13,
+    square_4 = 14,
+    square_5 = 15
+}
+
+-- for setting pad light in sequencer mode. May disappear somewhere else eventually.
 Push.note_table = {
     ["C"] = 0,
     ["D"] = 1,
@@ -234,6 +267,7 @@ Push.note_table = {
     ["B"] = 6
 }
 
+-- all the main action for the modes in here.
 Push.mode = {
     cc = {
         [50] = "sequencer",
@@ -696,16 +730,17 @@ Push.mode = {
 }
 
  function Push:open() 
+    if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
+        return false
+    end
+    
     if self.output.is_open then 
         self.output:close()
         print("closing output")
     end
-
+    
     self.output = renoise.Midi.create_output_device(self.device_name)
     print("opening output")
-    if self.output.name ~= self.device_name then
-        print("Cannot find Ableton Push device")
-    end
 
     if self.input.is_open then 
         self.input:close()
@@ -714,9 +749,7 @@ Push.mode = {
 
     self.input = renoise.Midi.create_input_device(self.device_name, {self, Push.handleMidi})
     print("opening input")
-    if self.input.name ~= self.device_name then
-        print("Cannot find Ableton Push device")
-    end
+    return true
 end
 
 function Push:close()
@@ -731,8 +764,16 @@ function Push:close()
 end
 
 function Push:start()
-    local data
-    self:open()
+    if not self:open() then 
+        print("[PushyPushPush]: Cannot find Ableton Push device") 
+        if renoise.tool():has_timer({self, Push.start}) then
+            return
+        else
+            renoise.tool():add_timer({self, Push.start}, 5000)
+        end
+        return 
+    end
+    if renoise.tool():has_timer({self, Push.start}) then renoise.tool():remove_timer({self, Push.start}) end
     Sysex.clearDisplay(push)
     self:changeMode(Push.mode.sequencer.cc, 127)
     renoise.tool().app_idle_observable:add_notifier(self, self.update)
