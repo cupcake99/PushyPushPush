@@ -35,7 +35,7 @@ function Sysex:formatLine (format, text, ...)
       line = select(1, ...)
       zone = select(2, ...)
     else 
-      print("missing or extra arguments to formatLine (format, text [, line[, zone]])")
+      print("missing or extra arguments to formatLine (format, text, line[, zone])")
       return nil
     end
     if s then s[5] = Sysex.line_number.write[line] else return nil end
@@ -50,7 +50,7 @@ function Sysex:formatLine (format, text, ...)
           s[9 + i] = string.byte(text, 1 + j)
           j = j + 1
       end
-      return s--, line, zone
+      return s--, line, zone -- not sure if these need to be saved, perhaps find some other way to store them if necessary
     else 
       for i = 0, string.len(text) - 1  do
           s[9 + i] = string.byte(text, 1 + i)
