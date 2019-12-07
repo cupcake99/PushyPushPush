@@ -20,22 +20,27 @@ Mode = {
             obj.controlCurrent.cc[60].value = ((song.tracks[obj.activeTrack].mute_state ~= 1) and Push.button_light.high + Push.blink.slow) or Push.button_light.low
             obj.controlCurrent.cc[44].value = (obj.activeTrack == 1 and Push.button_light.off) or Push.button_light.low 
             obj.controlCurrent.cc[45].value = (obj.activeTrack == (song.sequencer_track_count + song.send_track_count + 1) and Push.button_light.off) or Push.button_light.low 
+            obj.controlCurrent.cc[85].value = (song.transport.playing and Push.button_light.high) or Push.button_light.low 
+            obj.controlCurrent.cc[86].value = (song.transport.edit_mode and Push.button_light.high) or Push.button_light.low 
 
-            writeSequence(obj, {0, 0, 0})
+            writeSequence(obj, {0, 0, 1})
             
             obj.displayState.line[1].zone[1] = song.tracks[obj.activeTrack].name
+            obj.displayState.line[1].zone[2] = (song.selected_instrument.name == "" and "un-named") or song.selected_instrument.name
            
         end,
         action = function (obj, data)
-            if (data[1] == 144 or data[1] == 128) and data[2] > 35 and data[2] < 100 then
+            if data[1] == 144 and data[2] > 35 and data[2] < 100 then
                 insertNote(obj, data)
-                writeSequence(obj, {0, 0, 0})
+                writeSequence(obj, {0, 0, 1})
             elseif data[1] == 176 and data[2] == 85 then
                 Mode.play.action(obj, data[3])
             elseif data[1] == 176 and data[2] == 86 then
                 Mode.edit.action(obj, data[3])
-            elseif data[1] == 176 and data[2] == 14 then
+            elseif data[1] == 176 and data[2] == 15 then
                 writeSequence(obj, data)
+            elseif data[1] == 176 and data[2] == 79 then
+                setMasterVolume(obj, data[3])
             elseif data[1] == 176 and data[2] == 60 then
                 local muted = song.tracks[obj.activeTrack].mute_state ~= 1
                 if data[3] > 0 then
@@ -44,8 +49,10 @@ Mode = {
                 end
             elseif data[1] == 176 and (data[2] == 46 or data[2] == 47) then
                 writeSequence(obj, data)
-            elseif data[1] == 176 and (data[2] == 44 or data[2] == 45) then
+            elseif data[1] == 176 and ((data[2] == 44 or data[2] == 45) or data[2] == 71) then
                 changeTrack(obj, data)
+            elseif data[1] == 176 and data[2] == 72 then
+                changeInstrument(obj, data)
             else
                 return
             end
@@ -432,9 +439,19 @@ Mode = {
     }
 }
 
-function encoderParse (value)
-    if value == 0 then return 0
-    elseif value < 64 then return value else return -1 * (128 - value) end
+function encoderParse (obj, value, thinningLevel)
+    if value == 0 then return 0 end
+    if thinningLevel then 
+        table.insert(obj.encoderStream, value)
+        if #obj.encoderStream == 1 then 
+            if obj.encoderStream[1] < 64 then return obj.encoderStream[1] else return -1 * (128 - obj.encoderStream[1]) end
+        elseif #obj.encoderStream == thinningLevel then
+            obj.encoderStream = {}
+        end
+        return 0
+    else
+        if value < 64 then return value else return -1 * (128 - value) end
+    end
 end
 
 function receiveNote (obj, data)
@@ -447,11 +464,21 @@ function receiveNote (obj, data)
     end
 end
 
+function setMasterVolume (obj, value)
+    local shift_mult = (obj.shiftActive and 0.1) or 1
+    local val = song.tracks[song.sequencer_track_count + 1].postfx_volume.value + ((encoderParse(obj, value, 5) * 0.2) * shift_mult)
+    if val < song.tracks[song.sequencer_track_count + 1].postfx_volume.value_min then val = song.tracks[song.sequencer_track_count + 1].postfx_volume.value_min
+    elseif val > song.tracks[song.sequencer_track_count + 1].postfx_volume.value_max then val = song.tracks[song.sequencer_track_count + 1].postfx_volume.value_max end
+    song.tracks[song.sequencer_track_count + 1].postfx_volume.value = val
+end
+
 function setLine (obj, data)
     local pos = song.transport.playback_pos
     local shift_mult = (obj.shiftActive and 10) or 1
-    if data[2] == 14 then 
-        pos.line = pos.line + encoderParse(data[3]) * shift_mult
+    if data[2] == 15 then 
+        local encoderVal = encoderParse(obj, data[3], 7)
+        if encoderVal == 0 then return nil end
+        pos.line = pos.line + encoderVal * shift_mult
     elseif (data[2] == 46 or data[2] == 47) and data[3] > 0 then
         pos.line = pos.line + (((data[2] - 46 == 1) and 1) or -1) * shift_mult
     end
@@ -465,19 +492,50 @@ function setLine (obj, data)
 end
 
 function writeSequence (obj, data)
+    if data[3] == 0 then return end
     local pos = setLine(obj, data)
+    if pos == nil then return end
+    local note
+    local line
     for i = 36, 99 do
         if obj.controlCurrent.note[i] and obj.controlCurrent.note[i].hasLED then
             obj.controlCurrent.note[i].value = 1
         end
     end
-    for i = 0, 7 do
-        if pos.line < 5 then 
+    if song.patterns[pos.sequence].number_of_lines < 9 then
+        for i = 0, 7 do
             obj.controlCurrent.note[(92 - ((pos.line - 1) * 8)) + i].value = Push.pad_light.pale_mint_blue
-        elseif song.patterns[pos.sequence].number_of_lines > 8 and song.patterns[pos.sequence].number_of_lines - pos.line < 5 then 
-            obj.controlCurrent.note[(92 - ((7 - (song.patterns[pos.sequence].number_of_lines - pos.line)) * 8)) + i].value = Push.pad_light.pale_mint_blue
-        else
-            obj.controlCurrent.note[68 + i].value = Push.pad_light.pale_mint_blue
+        end
+        if song.patterns[1].is_empty then return end
+        if song.tracks[obj.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER or song.tracks[obj.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return end
+        for i = 1, song.patterns[pos.sequence].number_of_lines do
+            if song.patterns[1].tracks[obj.activeTrack].lines[i]:note_column(1).note_string ~= "---" then 
+                line = song.patterns[1].tracks[obj.activeTrack].lines[i]:note_column(1) 
+                note = Push.note_table[string.sub(line.note_string, 1, 1)]
+                obj.controlCurrent.note[(92 - ((i - 1) * 8)) + note].value = Push.pad_light.super_blue
+            end
+        end
+    else
+        for i = 0, 7 do
+            if pos.line < 5 then 
+                obj.controlCurrent.note[(92 - ((pos.line - 1) * 8)) + i].value = Push.pad_light.pale_mint_blue
+            elseif song.patterns[pos.sequence].number_of_lines > 8 and song.patterns[pos.sequence].number_of_lines - pos.line < 5 then 
+                obj.controlCurrent.note[(92 - ((7 - (song.patterns[pos.sequence].number_of_lines - pos.line)) * 8)) + i].value = Push.pad_light.pale_mint_blue
+            else
+                obj.controlCurrent.note[68 + i].value = Push.pad_light.pale_mint_blue
+            end
+        end
+        if song.patterns[1].is_empty then return end
+        if song.tracks[obj.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER or song.tracks[obj.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return end
+        if pos.line < 5 then pos.line = 4 elseif song.patterns[pos.sequence].number_of_lines > 8 and (pos.line > song.patterns[pos.sequence].number_of_lines - 4) then pos.line = song.patterns[pos.sequence].number_of_lines - 4 end
+        local j = 0
+        for i = pos.line - 3, pos.line + 4 do   
+            if song.patterns[1].tracks[obj.activeTrack].lines[i] then 
+                line = song.patterns[1].tracks[obj.activeTrack].lines[i]:note_column(1) 
+                note = Push.note_table[string.sub(line.note_string, 1, 1)]
+            end
+            if note then obj.controlCurrent.note[(92 - (j * 8)) + note].value = Push.pad_light.super_blue end
+            j = j + 1
         end
     end
     if pos.line == 1 then 
@@ -488,37 +546,47 @@ function writeSequence (obj, data)
         obj.controlCurrent.cc[46].value = Push.button_light.low
         obj.controlCurrent.cc[47].value = Push.button_light.low
     end
-    if pos.line < 5 then pos.line = 4 elseif song.patterns[pos.sequence].number_of_lines > 15 and (pos.line > song.patterns[pos.sequence].number_of_lines - 7) then pos.line = song.patterns[pos.sequence].number_of_lines - 7 end
-    if song.patterns[1].is_empty then return end
-    if song.tracks[obj.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER or song.tracks[obj.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return end
-    local j = 0
-    for i = pos.line - 3, pos.line + 4 do   
-        local note      
-        local line
-        if song.patterns[1].tracks[obj.activeTrack].lines[i] then 
-            line = song.patterns[1].tracks[obj.activeTrack].lines[i]:note_column(1) 
-            note = Push.note_table[string.sub(line.note_string, 1, 1)]
-        end
-        if note then obj.controlCurrent.note[(92 - (j * 8)) + note].value = Push.pad_light.super_blue end
-        j = j + 1
-    end
 end
 
-function setActiveTrack (obj) 
+function getActiveTrack (obj) 
     obj.activeTrack = song.selected_track_index
     obj.displayState.line[1].zone[1] = song.tracks[obj.activeTrack].name
-    writeSequence(obj, {0, 0, 0})
+    writeSequence(obj, {0, 0, 1})
     obj.dirty = true 
+end
+
+function getActiveInstrument (obj) 
+    obj.activeInstrument = song.selected_instrument_index
+    obj.displayState.line[1].zone[2] = (song.selected_instrument.name == "" and "un-named") or song.selected_instrument.name
+    writeSequence(obj, {0, 0, 1})
+    obj.dirty = true 
+end
+
+function getInstrumentCount (obj)
+    local instruments
+    for k, _ in pairs(song.instruments) do
+        instruments = k
+        print(k)
+    end
+    obj.instrumentCount = instruments
+
 end
 
 function changeTrack (obj, data)
     if data[3] == 0 then return end
-    if data[2] == 45 then
+    local direction
+    if data[2] == 71 then
+        direction = encoderParse(obj, data[3], 8)
+    else
+        direction = (data[2] == 45 and 1) or -1
+    end
+    if direction == 0 then return end
+    if direction >= 1 then
         if obj.activeTrack == song.sequencer_track_count + song.send_track_count + 1 then return end
         obj.controlCurrent.cc[45].value = (obj.activeTrack + 1 == (song.sequencer_track_count + song.send_track_count + 1) and Push.button_light.off) or Push.button_light.low 
         obj.controlCurrent.cc[44].value = (obj.controlCurrent.cc[44].value == 0 and Push.button_light.low) or obj.controlCurrent.cc[44].value
         song:select_next_track()
-    elseif data[2] == 44 then
+    elseif direction < 0 then
         if obj.activeTrack == 1 then return end
         obj.controlCurrent.cc[44].value = (obj.activeTrack - 1 == 1 and Push.button_light.off) or Push.button_light.low 
         obj.controlCurrent.cc[45].value = (obj.controlCurrent.cc[45].value == 0 and Push.button_light.low) or obj.controlCurrent.cc[45].value
@@ -526,34 +594,82 @@ function changeTrack (obj, data)
     end
 end
 
+function changeInstrument (obj, data)
+    if data[3] == 0 then return end
+    local direction = encoderParse(obj, data[3], 8)
+    if direction == 0 then return end
+    if direction >= 1 then
+        if obj.activeInstrument == renoise.Song.MAX_NUMBER_OF_INSTRUMENTS or obj.activeInstrument + 1 > obj.instrumentCount then return end
+        song.selected_instrument_index = obj.activeInstrument + 1
+    elseif direction < 0 then
+        if obj.activeInstrument == 1 then return end
+        song.selected_instrument_index = obj.activeInstrument - 1
+    end
+end
+
 function insertNote (obj, data)
     --renoise note value 0 = C-0 119, = B-9
+    if not song.transport.edit_mode then return end
+    if song.tracks[obj.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER or song.tracks[obj.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return end
     local pos = setLine(obj, {0,0,0})
     local note = Push.note_table[(data[2] - 36) % 8]
     local line = math.floor((99 - data[2]) / 8)
-    if pos.line < 4 then 
-        line = line - (pos.line - 1) 
-    elseif pos.line > (song.patterns[pos.sequence].number_of_lines - 4) then 
-        line = line - (7 + (song.patterns[pos.sequence].number_of_lines - pos.line))
-    else 
-        line = line - 3 
+    local no_funny_business
+    local str
+    if song.patterns[pos.sequence].number_of_lines < 9 or pos.line < 4 then
+        line = line + 1
+        if line > song.patterns[pos.sequence].number_of_lines or line < 1 then return end
+        no_funny_business = true
+    else
+        if pos.line > (song.patterns[pos.sequence].number_of_lines - 4) then 
+            line = (song.patterns[pos.sequence].number_of_lines - 7) + line
+            no_funny_business = true
+        else 
+            line = line - 3 
+        end
     end
     if data[1] == 144 then 
-        print(note, line) 
-        if note == "OFF" then
-            if note == song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string then song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string = "---"
-            else
-                song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string = note 
+        if no_funny_business then 
+            if note == "OFF" then
+                if note == song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].note_string then 
+                    song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].note_string = "---"
+                    song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].instrument_value = 255
+                else
+                    song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].note_string = note 
+                    song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].instrument_value = obj.activeInstrument - 1
+                end
+            elseif note then 
+                str = note .. "-" .. song.transport.octave
+                if str == song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].note_string then 
+                    song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].note_string = "---"
+                    song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].instrument_value = 255
+                else
+                    song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].note_string = str
+                    song.patterns[1].tracks[obj.activeTrack].lines[line].note_columns[1].instrument_value = obj.activeInstrument - 1
+                end
             end
-        elseif note then 
-            local str = note .. "-" .. song.transport.octave
-            if str == song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string then song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string = "---"
-            else
-                song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string = str
+        else
+            if note == "OFF" then
+                if note == song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string then 
+                    song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string = "---"
+                    song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].instrument_value = 255
+                else
+                    song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string = note 
+                    song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].instrument_value = obj.activeInstrument - 1
+                end
+            elseif note then 
+                local str = note .. "-" .. song.transport.octave
+                if str == song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string then 
+                    song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string = "---"
+                    song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].instrument_value = 255
+                else
+                    song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].note_string = str
+                    song.patterns[1].tracks[obj.activeTrack].lines[pos.line + line].note_columns[1].instrument_value = obj.activeInstrument - 1
+                end
             end
         end
     end
-    --respect record state
+
     --set current line if flag is true
     --play note if flag is true
 end

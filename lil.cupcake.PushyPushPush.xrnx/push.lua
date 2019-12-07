@@ -4,8 +4,11 @@ function Push:__init()
     self.device_name = Push.device_name
     self.output = {}
     self.input = {}
+    self.encoderStream = {}
     self.active_mode = ""
     self.activeTrack = nil
+    self.activeInstrument = nil
+    self.instrumentCount = 0
     self.displayState = {
         line = {
             {zone = {"", "", "", "", "", "", "", ""}}, 
@@ -361,12 +364,15 @@ function Push:start()
     end
     if tool:has_timer({self, Push.start}) then tool:remove_timer({self, Push.start}) end
     Sysex.clearDisplay(self)
+    getInstrumentCount(self)
     self.activeTrack = song.selected_track_index
+    self.activeInstrument = song.selected_instrument_index
     self:changeMode(Mode.sequencer.cc, 127)
     tool.app_idle_observable:add_notifier(self, self.update)
     song.transport.playing_observable:add_notifier(self, Mode.play.setActive)
     song.transport.edit_mode_observable:add_notifier(self, Mode.edit.setActive)
-    song.selected_track_index_observable:add_notifier(self, setActiveTrack)
+    song.selected_track_index_observable:add_notifier(self, getActiveTrack)
+    song.selected_instrument_index_observable:add_notifier(self, getActiveInstrument)
 end
 
 function Push:stop()
@@ -378,7 +384,7 @@ function Push:stop()
     if tool.app_idle_observable:has_notifier(self, self.update) then tool.app_idle_observable:remove_notifier(self, self.update) end
     if song.transport.playing_observable:has_notifier(self, Mode.play.setActive) then song.transport.playing_observable:remove_notifier(self, Mode.play.setActive) end
     if song.transport.edit_mode_observable:has_notifier(self, Mode.edit.setActive) then song.transport.edit_mode_observable:remove_notifier(self, Mode.edit.setActive) end
-    if song.selected_track_index_observable:has_notifier(self, setActiveTrack) then song.selected_track_index_observable:remove_notifier(self, setActiveTrack) end
+    if song.selected_track_index_observable:has_notifier(self, getActiveTrack) then song.selected_track_index_observable:remove_notifier(self, getActiveTrack) end
 end
 
 function Push:handleMidi(message)
