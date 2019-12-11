@@ -1,3 +1,5 @@
+_AUTO_RELOAD_DEBUG = true
+
 
 tool = nil
 song = nil
@@ -7,9 +9,11 @@ function letsGo ()
     tool = renoise.tool()
     song = renoise.song()
 
+    require 'utils'
     require 'push'
-    require 'sysex'
+    require 'state'
     require 'modes'
+    require 'midi'
 
     push = Push()
     push:start()
