@@ -21,6 +21,6 @@ function getControlFromType (want, data)
     return nil
 end
 
-function printSelf(self)
-    print(string.format("[%s] self:", type(self)), self)
+function printSelf(object)
+    print(string.format("[%s] self:", type(object)), object)
 end

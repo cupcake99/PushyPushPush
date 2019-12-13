@@ -9,11 +9,11 @@ function letsGo ()
     tool = renoise.tool()
     song = renoise.song()
 
-    require 'utils'
-    require 'push'
-    require 'state'
-    require 'modes'
-    require 'midi'
+    require "utils"
+    require "push"
+    require "state"
+    require "modes"
+    require "midi"
 
     push = Push()
     push:start()
