@@ -6,8 +6,8 @@ function Push:__init()
     self.input = {}
     self.encoderStream = {}
     self.midi = Midi(self)
-    self.state = nil
-    self.modes = nil
+    self.state = State(self)
+    self.modes = Modes(self)
 end
 
 Push.device_name = "Ableton Push (User Port)"
@@ -309,9 +309,9 @@ function Push:start()
     end
     if tool:has_timer({self, Push.start}) then tool:remove_timer({self, Push.start}) end
     self.midi:clearDisplay()
-    self.state = State(self)
+    -- self.state = State(self)
     self.state:getState()
-    self.modes = Modes(self)
+    -- self.modes = Modes(self)
     self.state.dirty = true
     self.state.activeMode = Modes.sequencer
     self.state.activeMode.lights(self.modes)

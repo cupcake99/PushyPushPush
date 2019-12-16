@@ -24,3 +24,5 @@ end
 function printSelf(object)
     print(string.format("[%s] self:", type(object)), object)
 end
+
+

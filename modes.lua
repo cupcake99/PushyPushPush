@@ -1,5 +1,5 @@
 -- all the main action for the modes in here.
-class 'Modes' 
+class "Modes"
 
 function Modes:__init(parent)
     self.push = parent
@@ -185,3 +185,5 @@ Modes.sequencer = {
         self.push.state.dirty = true
     end
 }
+
+

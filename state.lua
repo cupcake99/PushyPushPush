@@ -1,5 +1,5 @@
 
-class 'State'
+class "State"
 
 function State:__init(parent)
     self.push = parent
@@ -523,3 +523,4 @@ function State:insertNote (data)
     --set current line if flag is true
     --play note if flag is true
 end
+

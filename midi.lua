@@ -149,3 +149,4 @@ function Midi:clearDisplay (...)
         end
     end
 end
+
