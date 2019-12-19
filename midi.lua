@@ -23,15 +23,15 @@ Midi.status = {
 
 -- template for writing to screen - must be 77 bytes long even if empty
 Midi.sysex = {
-    write_line = { 
-        240, 71, 127, 21, 0, 0, 69, 0, 
-        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 
-        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 
-        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 
-        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 
-        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 
+    write_line = {
+        240, 71, 127, 21, 0, 0, 69, 0,
+        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
+        32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32, 32,
         32, 32, 32, 32, 32, 32, 32, 32,
-        247 
+        247
     },
 
     -- template for clearing line
@@ -72,9 +72,9 @@ end
 function Midi:encoderParse (data, thinningLevel)
     if data[3] == 0 then return 0 end
     if #self.push.encoderStream ~= 0 and self.push.encoderStream[#self.push.encoderStream].cc ~= data[2] then self.push.encoderStream = {} end
-    if thinningLevel then 
+    if thinningLevel then
         table.insert(self.push.encoderStream, {cc = data[2], value = data[3]})
-        if #self.push.encoderStream == 1 then 
+        if #self.push.encoderStream == 1 then
             if self.push.encoderStream[1].value < 64 then return self.push.encoderStream[1].value else return -1 * (128 - self.push.encoderStream[1].value) end
         elseif #self.push.encoderStream == thinningLevel then
             self.push.encoderStream = {}
@@ -87,34 +87,34 @@ end
 
 function Midi:writeText(data, ...)
     local n_args = select('#', ...)
-    if data then 
+    if data then
         self:sendMidi(data)
-        if n_args > 0 then 
-            local t = {...} 
+        if n_args > 0 then
+            local t = {...}
             local line = t[1]
             self.push.state.displaySysexByLine[line] = data
         end
     end
 end
 
--- format sysex table for writing to display. Byte 5 is always line number. Can write up to 68 characters long, byte values 0-127. 
+-- format sysex table for writing to display. Byte 5 is always line number. Can write up to 68 characters long, byte values 0-127.
 -- Function is variadic, (format, text, line, zone). First three are required, zone is optional.
 function Midi:formatLine (format, text, ...)
     local s = table.copy(format)
     local length = string.len(text)
     local n_args = select('#', ...)
-    local line, zone = 0, 0 
-    if n_args == 1 then 
+    local line, zone = 0, 0
+    if n_args == 1 then
         line = select(1, ...)
     elseif n_args == 2 then
         line = select(1, ...)
         zone = select(2, ...)
-    else 
+    else
         print("missing or extra arguments to formatLine (format, text, line[, zone])")
         return nil
     end
     if s then s[5] = Midi.sysex.line_number.write[line] else return nil end
-    if Midi.sysex.zone[zone] then 
+    if Midi.sysex.zone[zone] then
         local j = 0
         if length < 8 then
             for i = length, 8 do
@@ -126,7 +126,7 @@ function Midi:formatLine (format, text, ...)
             j = j + 1
         end
         return s--, line, zone -- not sure if these need to be saved, perhaps find some other way to store them if necessary
-    else 
+    else
         for i = 0, string.len(text) - 1  do
             s[9 + i] = string.byte(text, 1 + i)
         end

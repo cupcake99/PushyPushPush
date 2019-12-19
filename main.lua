@@ -1,6 +1,5 @@
 _AUTO_RELOAD_DEBUG = true
 
-
 tool = nil
 song = nil
 push = nil
@@ -30,5 +29,4 @@ end
 renoise.tool().app_new_document_observable:add_notifier(letsGo)
 renoise.tool().app_release_document_observable:add_notifier(goodnight)
 --push:stop()
-
 
