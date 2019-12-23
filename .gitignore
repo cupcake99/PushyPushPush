@@ -3,3 +3,5 @@
 .vscode
 *.vim
 *.*.swp
+*.sublime*
+.luacheckrc

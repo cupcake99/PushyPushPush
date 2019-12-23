@@ -1,6 +1,7 @@
 class "Midi"
+-- library of static functions and tables for MIDI communication and formatting
 
-function Midi:__init(parent)
+function Midi:__init (parent)
     self.push = parent
 end
 --[[
@@ -47,7 +48,7 @@ Midi.sysex = {
     zone = { 0, 9, 17, 26, 34, 43, 51, 60 }
 }
 
-function Midi:handleMidi(data)
+function Midi:handleMidi (data)
     assert(#data == 3)
     local control
     if data[1] == Midi.status.note_on then control = getControlFromType("note", data[2])
@@ -63,7 +64,7 @@ function Midi:handleMidi(data)
     self.push.state.activeMode.action(self.push.modes, data)
 end
 
-function Midi:sendMidi(data)
+function Midi:sendMidi (data)
     if self.push.output.is_open then
         self.push.output:send(data)
     end
@@ -85,7 +86,7 @@ function Midi:encoderParse (data, thinningLevel)
     end
 end
 
-function Midi:writeText(data, ...)
+function Midi:writeText (data, ...)
     local n_args = select('#', ...)
     if data then
         self:sendMidi(data)

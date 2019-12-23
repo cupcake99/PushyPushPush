@@ -12,7 +12,7 @@ function getControlFromType (want, data)
     elseif want == "cc" then
         if Push.control[index] ~= nil and Push.control[index].hasCC and Push.control[index].cc == data then return Push.control[index], index end
     elseif want == "name" then
-        for i = 1, 139 do
+        for i = 1, 120 do
             index = i + 128
             if Push.control[i] ~= nil and Push.control[i].name == data then return Push.control[i], i
             elseif Push.control[index] ~= nil and Push.control[index].name == data then return Push.control[index], index end
@@ -21,7 +21,7 @@ function getControlFromType (want, data)
     return nil
 end
 
-function printSelf(object)
+function printSelf (object)
     print(string.format("[%s] self:", type(object)), object)
 end
 

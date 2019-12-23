@@ -1,6 +1,7 @@
 class "State"
+-- representation of the state of the Renoise song and methods to change parameters within it
 
-function State:__init(parent)
+function State:__init (parent)
     self.push = parent
     self.activeMode = nil
     self.activeSeqIndex = nil
@@ -42,10 +43,10 @@ function State:getInstrumentCount ()
     if self.instrumentCount ~= instrumentCt then self.instrumentCount = instrumentCt end
 end
 
-function State:changeMode(data)
+function State:changeMode (data)
     if not self.activeMode then return false end
     if not self.push.modes.select[data[2]] then return false end
-    if self.push.modes.select[data[2]].cc == data[2] then return false end
+    -- if self.push.modes.select[data[2]].cc == data[2] then return false end
     local mode = self.push.modes.select[data[2]]
     if self.activeMode.name ~= mode.name and data[3] > 1 then
         self.activeMode = mode

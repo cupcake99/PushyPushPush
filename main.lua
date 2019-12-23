@@ -1,4 +1,4 @@
-_AUTO_RELOAD_DEBUG = true
+-- _AUTO_RELOAD_DEBUG = true
 
 tool = nil
 song = nil

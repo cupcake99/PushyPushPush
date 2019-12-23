@@ -1,99 +1,17 @@
 class "Modes"
+-- mappings to connect actions from the Push device to the state of the Renoise song
 
-function Modes:__init(parent)
+function Modes:__init (parent)
     self.push = parent
     self.select = {
+        -- use this construction to map mode objects to buttons on the Push by button name (second argument)
+        -- just a fancy way to set the index to the CC of the Push button without having to use a literal fixed value
+        -- the mode is passed as an object reference and should be 'read only' (static const)
         [getControlFromType("name", "note").cc] = Modes.sequencer
+        -- [getControlFromType("name", "track").cc] = Modes.track
+        -- [getControlFromType("name", "device").cc] = Modes.instrument
+        -- [getControlFromType("name", "session").cc] = Modes.matrix
     }
--- self.track = {
---     name = "track",
---     cc = 0,
---     lights = {}
---     display = {
---
---     },
---     action = function (obj, data)
---         if (data[1] == 144 or data[1] == 128) and data[2] > 35 and data[2] < 100 then
---             receiveNote(obj, data)
---         elseif data[1] == 176 and data[2] == 85 then
---             Mode.play.action(obj, data[3])
---         elseif data[1] == 176 and data[2] == 86 then
---             Mode.edit.action(obj, data[3])
---         elseif data[1] == 176 and data[2] >= 102 and data[2] <= 109 then
---             local muted = song.tracks[obj.activeTrack + data[2] - 102].mute_state ~= 1
---             if data[3] > 0 then
---                 if muted then song.tracks[obj.activeTrack + data[2] - 102]:unmute() else song.tracks[obj.activeTrack + data[2] - 102]:mute() end
---                 obj.controlCurrent.cc[data[2]].value = ((song.tracks[obj.activeTrack + data[2] - 102].mute_state == 1) and Push.pad_light.pink) or 0
---             end
---         else
---             return
---         end
---         obj.dirty = true
---     end,
--- }
-
--- self.instrument = {
---     name = "instrument",
---     setup = function (obj)
---         for i = 0, 127 do
---             if obj.controlCurrent.cc[i] and obj.controlCurrent.cc[i].hasLED then
---                 obj.controlCurrent.cc[i].value = Mode.instrument.LEDs[i].value
---             end
---             if obj.controlCurrent.note[i] and obj.controlCurrent.note[i].hasLED then
---                 obj.controlCurrent.note[i].value = 0
---             end
---         end
---         for i = 1, 4 do
---             for j = 1, 8 do
---                 obj.displayState.line[i].zone[j] = ""
---             end
---         end
---     end,
---     action = function (obj, data)
---         if (data[1] == 144 or data[1] == 128) and data[2] > 35 and data[2] < 100 then
---             receiveNote(obj, data)
---         elseif data[1] == 176 and data[2] == 85 then
---             Mode.play.action(obj, data[3])
---         elseif data[1] == 176 and data[2] == 86 then
---             Mode.edit.action(obj, data[3])
---         else
---             return
---         end
---         obj.dirty = true
---     end
--- }
-
--- self.matrix = {
---     name = "matrix",
---     setup = function (obj)
---         for i = 0, 127 do
---             if obj.controlCurrent.cc[i] and obj.controlCurrent.cc[i].hasLED then
---                 obj.controlCurrent.cc[i].value = Mode.matrix.LEDs[i].value
---             end
---             if obj.controlCurrent.note[i] and obj.controlCurrent.note[i].hasLED then
---                 obj.controlCurrent.note[i].value = 0
---             end
---         end
---         for i = 1, 4 do
---             for j = 1, 8 do
---                 obj.displayState.line[i].zone[j] = ""
---             end
---         end
---     end,
---     action = function (obj, data)
---         if (data[1] == 144 or data[1] == 128) and data[2] > 35 and data[2] < 100 then
---             receiveNote(obj, data)
---         elseif data[1] == 176 and data[2] == 85 then
---             Mode.play.action(obj, data[3])
---         elseif data[1] == 176 and data[2] == 86 then
---             Mode.edit.action(obj, data[3])
---         else
---             return
---         end
---         obj.dirty = true
---     end
--- }
-
 end
 
 Modes.sequencer = {
@@ -101,7 +19,7 @@ Modes.sequencer = {
     cc = 50,
     lights = function (self)
         local index
-        for i = 1, 139 do
+        for i = 1, 120 do
             if Push.control[i] and Push.control[i].hasLED then
                 if Push.control[i].name == "stop" then self.push.state.current[i].value = Push.light.button.off
                 elseif Push.control[i].name == "note" then self.push.state.current[i].value = Push.light.button.high
@@ -185,3 +103,89 @@ Modes.sequencer = {
     end
 }
 
+-- Midi.track = {
+--     name = "track",
+--     cc = 0,
+--     lights = function (self)
+
+--     end,
+--     display = function (self)
+
+--     end,
+--     action = function (self, data)
+--         if (data[1] == 144 or data[1] == 128) and data[2] > 35 and data[2] < 100 then
+--             receiveNote(self, data)
+--         elseif data[1] == 176 and data[2] == 85 then
+--             Mode.play.action(self, data[3])
+--         elseif data[1] == 176 and data[2] == 86 then
+--             Mode.edit.action(self, data[3])
+--         elseif data[1] == 176 and data[2] >= 102 and data[2] <= 109 then
+--             local muted = song.tracks[self.activeTrack + data[2] - 102].mute_state ~= 1
+--             if data[3] > 0 then
+--                 if muted then song.tracks[self.activeTrack + data[2] - 102]:unmute() else song.tracks[self.activeTrack + data[2] - 102]:mute() end
+--                 self.controlCurrent.cc[data[2]].value = ((song.tracks[self.activeTrack + data[2] - 102].mute_state == 1) and Push.pad_light.pink) or 0
+--             end
+--         else
+--             return
+--         end
+--         self.push.state.dirty = true
+--     end
+-- }
+
+-- Midi.instrument = {
+--     name = "instrument",
+--     cc = 0,
+--     lights = function (self)
+
+--     end,
+--     display = function (self)
+
+--     end,
+--     action = function (self, data)
+--         if (data[1] == 144 or data[1] == 128) and data[2] > 35 and data[2] < 100 then
+--             receiveNote(self, data)
+--         elseif data[1] == 176 and data[2] == 85 then
+--             Mode.play.action(self, data[3])
+--         elseif data[1] == 176 and data[2] == 86 then
+--             Mode.edit.action(self, data[3])
+--         elseif data[1] == 176 and data[2] >= 102 and data[2] <= 109 then
+--             local muted = song.tracks[self.activeTrack + data[2] - 102].mute_state ~= 1
+--             if data[3] > 0 then
+--                 if muted then song.tracks[self.activeTrack + data[2] - 102]:unmute() else song.tracks[self.activeTrack + data[2] - 102]:mute() end
+--                 self.controlCurrent.cc[data[2]].value = ((song.tracks[self.activeTrack + data[2] - 102].mute_state == 1) and Push.pad_light.pink) or 0
+--             end
+--         else
+--             return
+--         end
+--         self.push.state.dirty = true
+--     end
+-- }
+
+-- Midi.matrix = {
+--     name = "matrix",
+--     cc = 0,
+--     lights = function (self)
+
+--     end,
+--     display = function (self)
+
+--     end,
+--     action = function (self, data)
+--         if (data[1] == 144 or data[1] == 128) and data[2] > 35 and data[2] < 100 then
+--             receiveNote(self, data)
+--         elseif data[1] == 176 and data[2] == 85 then
+--             Mode.play.action(self, data[3])
+--         elseif data[1] == 176 and data[2] == 86 then
+--             Mode.edit.action(self, data[3])
+--         elseif data[1] == 176 and data[2] >= 102 and data[2] <= 109 then
+--             local muted = song.tracks[self.activeTrack + data[2] - 102].mute_state ~= 1
+--             if data[3] > 0 then
+--                 if muted then song.tracks[self.activeTrack + data[2] - 102]:unmute() else song.tracks[self.activeTrack + data[2] - 102]:mute() end
+--                 self.controlCurrent.cc[data[2]].value = ((song.tracks[self.activeTrack + data[2] - 102].mute_state == 1) and Push.pad_light.pink) or 0
+--             end
+--         else
+--             return
+--         end
+--         self.push.state.dirty = true
+--     end
+-- }
