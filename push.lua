@@ -310,6 +310,10 @@ function Push:start ()
     end
     if tool:has_timer({self, Push.start}) then tool:remove_timer({self, Push.start}) end
     self.midi:clearDisplay()
+    -- self.midi:initOSC()
+    -- if self.midi.server then
+    --     self.midi:runServer()
+    -- end
     -- self.state = State(self)
     self.state:getState()
     -- self.modes = Modes(self)
@@ -340,6 +344,10 @@ function Push:stop ()
         data = {Midi.status.note_on, i, Push.light.pad.off}
         self.midi:sendMidi(data)
     end
+
+    -- if self.midi.server then
+    --     self.midi:closeServer()
+    -- end
 
     self:close()
 
@@ -374,7 +382,7 @@ function Push:update ()
         local data, dummy, index
         local string = table.copy(Midi.sysex.write_line)
         for i = 1, 120 do
-                if self.state.current[i] and self.state.current[i].hasCC and self.state.current[i].hasLED then
+            if self.state.current[i] and self.state.current[i].hasCC and self.state.current[i].hasLED then
                 data = {Midi.status.cc, self.state.current[i].cc, self.state.current[i].value}
                 self.midi:sendMidi(data)
             end
@@ -383,7 +391,6 @@ function Push:update ()
                 data = {Midi.status.note_on, self.state.current[index].note, self.state.current[index].value}
                 self.midi:sendMidi(data)
             end
-
         end
         for i = 1, 4 do
         dummy = string

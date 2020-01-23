@@ -5,8 +5,8 @@ function Modes:__init (parent)
     self.push = parent
     self.select = {
         -- use this construction to map mode objects to buttons on the Push by button name (second argument)
-        -- just a fancy way to set the index to the CC of the Push button without having to use a literal fixed value
-        -- the mode is passed as an object reference and should be 'read only' (static const)
+        -- just a fancy way to set the index to the CC of the Push button without having to use a literal numerical
+        -- CC value (opaque). The mode is passed as an object reference and should be 'read only' (static const)
         [getControlFromType("name", "note").cc] = Modes.sequencer
         -- [getControlFromType("name", "track").cc] = Modes.track
         -- [getControlFromType("name", "device").cc] = Modes.instrument
@@ -19,37 +19,40 @@ Modes.sequencer = {
     cc = 50,
     lights = function (self)
         local index
+        local control, current = Push.control, self.push.state.current
+        local trk = self.push.state.activeTrack
         for i = 1, 120 do
-            if Push.control[i] and Push.control[i].hasLED then
-                if Push.control[i].name == "stop" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "note" then self.push.state.current[i].value = Push.light.button.high
-                elseif Push.control[i].name == "x32t" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "x32" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "x16t" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "x16" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "x8t" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "x8" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "x4t" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "x4" then self.push.state.current[i].value = Push.light.button.off
-                elseif Push.control[i].name == "mute" then
-                    self.push.state.current[i].value = ((song.tracks[self.push.state.activeTrack].mute_state ~= 1) and Push.light.button.high + Push.light.blink.slow) or Push.light.button.low
-                elseif Push.control[i].name == "csr_left" then
-                    self.push.state.current[i].value = (self.push.state.activeTrack == 1 and Push.light.button.off) or Push.light.button.low
-                elseif Push.control[i].name == "csr_right" then
-                    self.push.state.current[i].value = (self.push.state.activeTrack == (song.sequencer_track_count + song.send_track_count + 1) and Push.light.button.off) or Push.light.button.low
+            if control[i] and control[i].hasLED then
+                if control[i].name == "stop" then current[i].value = Push.light.button.off
+                elseif control[i].name == "note" then current[i].value = Push.light.button.high
+                elseif control[i].name == "x32t" then current[i].value = Push.light.button.off
+                elseif control[i].name == "x32" then current[i].value = Push.light.button.off
+                elseif control[i].name == "x16t" then current[i].value = Push.light.button.off
+                elseif control[i].name == "x16" then current[i].value = Push.light.button.off
+                elseif control[i].name == "x8t" then current[i].value = Push.light.button.off
+                elseif control[i].name == "x8" then current[i].value = Push.light.button.off
+                elseif control[i].name == "x4t" then current[i].value = Push.light.button.off
+                elseif control[i].name == "x4" then current[i].value = Push.light.button.off
+                elseif control[i].name == "mute" then
+                    current[i].value = ((song.tracks[trk].mute_state ~= 1)
+                    and Push.light.button.high + Push.light.blink.slow) or Push.light.button.low
+                elseif control[i].name == "csr_left" then
+                    current[i].value = (trk == 1 and Push.light.button.off) or Push.light.button.low
+                elseif control[i].name == "csr_right" then
+                    current[i].value = (trk == (song.sequencer_track_count + song.send_track_count + 1)
+                    and Push.light.button.off) or Push.light.button.low
                 end
             end
             index = i + 128
-            if self.push.state.current[index] and self.push.state.current[index].hasNote and self.push.state.current[index].hasLED then
-                self.push.state.current[index].value = 1
-            end
+            if current[index] and current[index].hasNote and current[index].hasLED then current[index].value = 1 end
         end
     end,
     display = function (self)
-        self.push.state.display.line[1].zone[1] = song.tracks[self.push.state.activeTrack].name
-        self.push.state.display.line[1].zone[2] = (song.selected_instrument.name == "" and "un-named") or song.selected_instrument.name
-        self.push.state.display.line[1].zone[3] = " Length:"
-        self.push.state.display.line[2].zone[3] = "   " .. song.patterns[self.push.state.activePattern].number_of_lines
+        local display = self.push.state.display
+        display.line[1].zone[1] = song.tracks[self.push.state.activeTrack].name
+        display.line[1].zone[2] = (song.selected_instrument.name == "" and "un-named") or song.selected_instrument.name
+        display.line[1].zone[3] = " Length:"
+        display.line[2].zone[3] = "   " .. song.patterns[self.push.state.activePattern].number_of_lines
     end,
     action = function (self, data)
         local control, index
@@ -84,8 +87,11 @@ Modes.sequencer = {
             elseif control.name == "mute" then
                 local muted = song.tracks[self.push.state.activeTrack].mute_state ~= 1
                 if data[3] > 0 then
-                    if muted then song.tracks[self.push.state.activeTrack]:unmute() else song.tracks[self.push.state.activeTrack]:mute() end
-                    self.push.state.current[index].value = ((song.tracks[self.push.state.activeTrack].mute_state ~= 1) and Push.light.button.high + Push.light.blink.slow) or Push.light.button.low
+                    if muted then song.tracks[self.push.state.activeTrack]:unmute()
+                    else song.tracks[self.push.state.activeTrack]:mute() end
+                    self.push.state.current[index].value =
+                    ((song.tracks[self.push.state.activeTrack].mute_state ~= 1)
+                    and Push.light.button.high + Push.light.blink.slow) or Push.light.button.low
                 end
             elseif control.name == "csr_up" or control.name == "csr_down" then
                 if self.push.state:setLine(data) then
@@ -189,3 +195,4 @@ Modes.sequencer = {
 --         self.push.state.dirty = true
 --     end
 -- }
+

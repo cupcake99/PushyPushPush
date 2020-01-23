@@ -5,3 +5,5 @@
 *.*.swp
 *.sublime*
 .luacheckrc
+tags
+.ctags.d

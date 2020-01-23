@@ -1,11 +1,10 @@
 -- _AUTO_RELOAD_DEBUG = true
 
-tool = nil
+tool = renoise.tool()
 song = nil
 push = nil
 
 function letsGo ()
-    tool = renoise.tool()
     song = renoise.song()
 
     require "utils"
@@ -26,7 +25,7 @@ function goodnight ()
     push = nil
 end
 
-renoise.tool().app_new_document_observable:add_notifier(letsGo)
-renoise.tool().app_release_document_observable:add_notifier(goodnight)
+tool.app_new_document_observable:add_notifier(letsGo)
+tool.app_release_document_observable:add_notifier(goodnight)
 --push:stop()
 

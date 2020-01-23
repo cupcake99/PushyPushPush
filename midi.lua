@@ -3,6 +3,10 @@ class "Midi"
 
 function Midi:__init (parent)
     self.push = parent
+    -- self.server = nil
+    -- self.client = nil
+    -- self.address = Midi.OSCAddress
+    -- self.port = Midi.OSCPort
 end
 --[[
     128 = "note off"
@@ -13,7 +17,11 @@ end
     208 = ""
     224 = "pitch bend"
 ]]
+--[[
+Midi.OSCAddress = "localhost"
 
+Midi.OSCPort = 9999
+--]]
 Midi.status = {
     note_on = 144,
     note_off = 128,
@@ -72,11 +80,17 @@ end
 
 function Midi:encoderParse (data, thinningLevel)
     if data[3] == 0 then return 0 end
-    if #self.push.encoderStream ~= 0 and self.push.encoderStream[#self.push.encoderStream].cc ~= data[2] then self.push.encoderStream = {} end
+    if #self.push.encoderStream ~= 0 and self.push.encoderStream[#self.push.encoderStream].cc ~= data[2] then
+        self.push.encoderStream = {}
+    end
     if thinningLevel then
         table.insert(self.push.encoderStream, {cc = data[2], value = data[3]})
         if #self.push.encoderStream == 1 then
-            if self.push.encoderStream[1].value < 64 then return self.push.encoderStream[1].value else return -1 * (128 - self.push.encoderStream[1].value) end
+            if self.push.encoderStream[1].value < 64 then
+                return self.push.encoderStream[1].value
+            else
+                return -1 * (128 - self.push.encoderStream[1].value)
+            end
         elseif #self.push.encoderStream == thinningLevel then
             self.push.encoderStream = {}
         end
@@ -150,4 +164,43 @@ function Midi:clearDisplay (...)
         end
     end
 end
+--[[
+function Midi:initOSC ()
+    local socket_error
+    if not self.server then
+        self.server, socket_error = renoise.Socket.create_server(self.address, self.port, renoise.Socket.PROTOCOL_UDP)
+    end
+    if socket_error then
+        renoise.app():show_warning(("Failed to start the OSC server. Error: '%s'"):format(socket_error))
+        return
+    end
+end
 
+
+function Midi:runServer ()
+
+    self.server:run {
+        socket_message = function (socket, data)
+
+            local message_or_bundle, osc_error = renoise.Osc.from_binary_data(data)
+
+            if (message_or_bundle) then
+                if (type(message_or_bundle) == "Message") then
+                    print(("Got OSC message: '%s'"):format(tostring(message_or_bundle)))
+
+                elseif (type(message_or_bundle) == "Bundle") then
+                    print(("Got OSC bundle: '%s'"):format(tostring(message_or_bundle)))
+                end
+            else
+                print(("Got invalid OSC data, or data which is not OSC data at all. Error: '%s'"):format(osc_error))
+            end
+
+        end
+    }
+    print("server running?", self.server.is_running)
+end
+
+function Midi:closeServer ()
+    self.server:close()
+end
+--]]

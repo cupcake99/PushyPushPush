@@ -45,9 +45,9 @@ end
 
 function State:changeMode (data)
     if not self.activeMode then return false end
-    if not self.push.modes.select[data[2]] then return false end
-    -- if self.push.modes.select[data[2]].cc == data[2] then return false end
     local mode = self.push.modes.select[data[2]]
+    if not mode then return false end
+    -- if self.push.modes.select[data[2]].cc == data[2] then return false end
     if self.activeMode.name ~= mode.name and data[3] > 1 then
         self.activeMode = mode
         self.activeMode.lights(self.push.modes)
@@ -115,11 +115,20 @@ function State:setLine (data)
     -- print("Set Line: \n", "Sequence: ", pos.sequence, "\n", "Line: ", pos.line)
     if song.transport.wrapped_pattern_edit then
         if pos.line < 1 then
-            pos.line = (pos.sequence == 1 and 1) or song.patterns[song.sequencer:pattern(pos.sequence - 1)].number_of_lines
-            pos.sequence = (pos.sequence - 1 > 0 and pos.sequence - 1) or 1
+            pos.line = (
+                pos.sequence == 1 and 1
+                ) or song.patterns[song.sequencer:pattern(pos.sequence - 1)].number_of_lines
+            pos.sequence = (
+                pos.sequence - 1 > 0 and pos.sequence - 1
+                ) or 1
         elseif pos.line > song.patterns[self.activePattern].number_of_lines then
-            pos.line = (pos.sequence == song.transport.song_length.sequence and song.patterns[self.activePattern].number_of_lines) or 1
-            pos.sequence = (pos.sequence + 1 < song.transport.song_length.sequence + 1 and pos.sequence + 1) or song.transport.song_length.sequence
+            pos.line = (
+                pos.sequence == song.transport.song_length.sequence
+                and song.patterns[self.activePattern].number_of_lines
+                ) or 1
+            pos.sequence = (
+                pos.sequence + 1 < song.transport.song_length.sequence + 1 and pos.sequence + 1
+                ) or song.transport.song_length.sequence
         end
     else
         if pos.line < 1 then
@@ -149,24 +158,30 @@ function State:setPatternDisplay (data)
     if data[3] == 0 then return end
     -- local pos = setLine(self, data)
     if self.activePattern == nil then return end
-    if self.activeLine > song.patterns[self.activePattern].number_of_lines then print("[PushyPushPush] ERROR: Invalid Line Index for setPatternDisplay") return end
+    if self.activeLine > song.patterns[self.activePattern].number_of_lines then
+        print("[PushyPushPush] ERROR: Invalid Line Index for setPatternDisplay")
+        return
+    end
     local note
     local line
+    local patt = self.activePattern
+    local trk = self.activeTrack
     for i = 36, 99 do
         i = i + 128
         if self.current[i] and self.current[i].hasLED then
             self.current[i].value = 1
         end
     end
-    if song.patterns[self.activePattern].number_of_lines < 9 then
+    if song.patterns[patt].number_of_lines < 9 then
         for i = 0, 7 do
             self.current[(92 - ((self.activeLine - 1) * 8)) + i].value = Push.light.pad.pale_mint_blue
         end
-        if song.patterns[self.activePattern].is_empty then return end
-        if song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER or song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return end
-        for i = 1, song.patterns[self.activePattern].number_of_lines do
-            if song.patterns[self.activePattern].tracks[self.activeTrack].lines[i]:note_column(1).note_string ~= "---" then
-                line = song.patterns[self.activePattern].tracks[self.activeTrack].lines[i]:note_column(1)
+        if song.patterns[patt].is_empty then return end
+        if song.tracks[trk].type == renoise.Track.TRACK_TYPE_MASTER
+        or song.tracks[trk].type == renoise.Track.TRACK_TYPE_SEND then return end
+        for i = 1, song.patterns[patt].number_of_lines do
+            if song.patterns[patt].tracks[trk].lines[i]:note_column(1).note_string ~= "---" then
+                line = song.patterns[patt].tracks[trk].lines[i]:note_column(1)
                 note = self.note_table[string.sub(line.note_string, 1, 1)]
                 self.current[(92 - ((i - 1) * 8)) + note].value = Push.light.pad.super_blue
             end
@@ -175,20 +190,29 @@ function State:setPatternDisplay (data)
         for i = 0, 7 do
             if self.activeLine < 5 then
                 self.current[(92 - ((self.activeLine - 1) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
-            elseif song.patterns[self.activePattern].number_of_lines > 8 and song.patterns[self.activePattern].number_of_lines - self.activeLine < 5 then
-                self.current[(92 - ((7 - (song.patterns[self.activePattern].number_of_lines - self.activeLine)) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
+            elseif song.patterns[patt].number_of_lines > 8
+            and song.patterns[patt].number_of_lines - self.activeLine < 5 then
+                self.current[
+                    (92 - ((7 - (song.patterns[patt].number_of_lines - self.activeLine)) * 8)) + 128 + i
+                ].value = Push.light.pad.pale_mint_blue
             else
                 self.current[68 + 128 + i].value = Push.light.pad.pale_mint_blue
             end
         end
-        if song.patterns[self.activePattern].is_empty then return end
-        if song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER or song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return end
+        if song.patterns[patt].is_empty then return end
+        if song.tracks[trk].type == renoise.Track.TRACK_TYPE_MASTER
+        or song.tracks[trk].type == renoise.Track.TRACK_TYPE_SEND then
+            return
+        end
         local pos = self.activeLine
-        if pos < 5 then pos = 4 elseif song.patterns[self.activePattern].number_of_lines > 8 and (pos > song.patterns[self.activePattern].number_of_lines - 4) then pos = song.patterns[self.activePattern].number_of_lines - 4 end
+        if pos < 5 then pos = 4 elseif song.patterns[patt].number_of_lines > 8
+        and (pos > song.patterns[patt].number_of_lines - 4) then
+            pos = song.patterns[patt].number_of_lines - 4
+        end
         local j = 0
         for i = pos - 3, pos + 4 do
-            if song.patterns[self.activePattern].tracks[self.activeTrack].lines[i] then
-                line = song.patterns[self.activePattern].tracks[self.activeTrack].lines[i]:note_column(1)
+            if song.patterns[patt].tracks[trk].lines[i] then
+                line = song.patterns[patt].tracks[trk].lines[i]:note_column(1)
                 note = self.note_table[string.sub(line.note_string, 1, 1)]
             end
             if note then self.current[(92 - (j * 8)) + 128 + note].value = Push.light.pad.super_blue end
@@ -287,7 +311,9 @@ function State:setActiveInstrument ()
     if self.activeInstrument ~= song.selected_instrument_index then
         self.activeInstrument = song.selected_instrument_index
         -- print("Instrument: ", self.activeInstrument)
-        self.display.line[1].zone[2] = (song.selected_instrument.name == "" and "un-named") or song.selected_instrument.name
+        self.display.line[1].zone[2] = (
+            song.selected_instrument.name == "" and "un-named"
+            ) or song.selected_instrument.name
         self.dirty = true
     end
 end
@@ -304,17 +330,25 @@ function State:changeSequence (data)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activeSeqIndex == song.transport.song_length.sequence then return end
-        if song.patterns[song.sequencer:pattern(self.activeSeqIndex + 1)].number_of_lines < song.patterns[self.activePattern].number_of_lines then
+        if song.patterns[song.sequencer:pattern(self.activeSeqIndex + 1)].number_of_lines
+        < song.patterns[self.activePattern].number_of_lines then
             self.activeLine = song.patterns[song.sequencer:pattern(self.activeSeqIndex + 1)].number_of_lines
         end
-        if pos then song.transport.edit_pos.sequence = pos.sequence + 1; song.transport.playback_pos.sequence = pos.sequence + 1 end
+        if pos then
+            song.transport.edit_pos.sequence = pos.sequence + 1
+            song.transport.playback_pos.sequence = pos.sequence + 1
+        end
         song.selected_sequence_index = self.activeSeqIndex + 1
     elseif direction < 0 then
         if self.activeSeqIndex == 1 then return end
-        if song.patterns[song.sequencer:pattern(self.activeSeqIndex - 1)].number_of_lines < song.patterns[self.activePattern].number_of_lines then
+        if song.patterns[song.sequencer:pattern(self.activeSeqIndex - 1)].number_of_lines
+        < song.patterns[self.activePattern].number_of_lines then
             self.activeLine = song.patterns[song.sequencer:pattern(self.activeSeqIndex - 1)].number_of_lines
         end
-        if pos then song.transport.edit_pos.sequence = pos.sequence - 1; song.transport.playback_pos.sequence = pos.sequence - 1  end
+        if pos then
+            song.transport.edit_pos.sequence = pos.sequence - 1
+            song.transport.playback_pos.sequence = pos.sequence - 1
+        end
         song.selected_sequence_index = self.activeSeqIndex - 1
     end
     -- print("change seq, seq: ", self.activeSeqIndex)
@@ -367,7 +401,8 @@ function State:changeTrack (data)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activeTrack == song.sequencer_track_count + song.send_track_count + 1 then return end
-        self.current[45].value = (self.activeTrack + 1 == (song.sequencer_track_count + song.send_track_count + 1) and Push.light.button.off) or Push.light.button.low
+        self.current[45].value = (self.activeTrack + 1 == (song.sequencer_track_count + song.send_track_count + 1)
+        and Push.light.button.off) or Push.light.button.low
         self.current[44].value = (self.current[44].value == 0 and Push.light.button.low) or self.current[44].value
         song:select_next_track()
     elseif direction < 0 then
@@ -383,7 +418,8 @@ function State:changeInstrument (data)
     local direction = self.push.midi:encoderParse(data, 8)
     if direction == 0 then return end
     if direction >= 1 then
-        if self.activeInstrument == renoise.Song.MAX_NUMBER_OF_INSTRUMENTS or self.activeInstrument + 1 > self.instrumentCount then return end
+        if self.activeInstrument == renoise.Song.MAX_NUMBER_OF_INSTRUMENTS
+        or self.activeInstrument + 1 > self.instrumentCount then return end
         song.selected_instrument_index = song.selected_instrument_index + 1
     elseif direction < 0 then
         if self.activeInstrument == 1 then return end
@@ -398,52 +434,54 @@ function State:setSharp (data) --need to block action on notes E and B and set l
     local line
     local sharp
     local no_funny_business
-    if data[3] > 0  and self.current[data[2]].value == 0 then
+    local patrn = song.patterns[self.activePattern]
+    local trk = self.activeTrack
+    if data[3] > 0 and self.current[data[2]].value == 0 then
         line = 7 - (data[2] - 36)
-        if song.patterns[self.activePattern].number_of_lines < 9 or self.activeLine < 4 then
+        if patrn.number_of_lines < 9 or self.activeLine < 4 then
             line = line + 1
-            if line > song.patterns[self.activePattern].number_of_lines or line < 1 then return false end
+            if line > patrn.number_of_lines or line < 1 then return false end
             no_funny_business = true
         else
-            if self.activeLine > (song.patterns[self.activePattern].number_of_lines - 4) then
-                line = (song.patterns[self.activePattern].number_of_lines - 7) + line
+            if self.activeLine > (patrn.number_of_lines - 4) then
+                line = (patrn.number_of_lines - 7) + line
                 no_funny_business = true
             else
                 line = line - 3
             end
         end
         if no_funny_business then
-            note = song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string
+            note = patrn.tracks[trk].lines[line].note_columns[1].note_string
             if note == "---" or note == "OFF" then return end
-            song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string = string.gsub(note, "-", "#")
+            patrn.tracks[trk].lines[line].note_columns[1].note_string = string.gsub(note, "-", "#")
         else
-            note = song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string
+            note = patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string
             if note == "---" or note == "OFF" then return end
-            song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string = string.gsub(note, "-", "#")
+            patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string = string.gsub(note, "-", "#")
         end
         self.current[data[2]].value = Push.light.note_val.orange
     else
         line = 7 - (data[2] - 36)
-        if song.patterns[self.activePattern].number_of_lines < 9 or self.activeLine < 4 then
+        if patrn.number_of_lines < 9 or self.activeLine < 4 then
             line = line + 1
-            if line > song.patterns[self.activePattern].number_of_lines or line < 1 then return false end
+            if line > patrn.number_of_lines or line < 1 then return false end
             no_funny_business = true
         else
-            if self.activeLine > (song.patterns[self.activePattern].number_of_lines - 4) then
-                line = (song.patterns[self.activePattern].number_of_lines - 7) + line
+            if self.activeLine > (patrn.number_of_lines - 4) then
+                line = (patrn.number_of_lines - 7) + line
                 no_funny_business = true
             else
                 line = line - 3
             end
         end
         if no_funny_business then
-            note = song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string
+            note = patrn.tracks[trk].lines[line].note_columns[1].note_string
             if note == "---" or note == "OFF" then return end
-            song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string = string.gsub(note, "#", "-")
+            patrn.tracks[trk].lines[line].note_columns[1].note_string = string.gsub(note, "#", "-")
         else
-            note = song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string
+            note = patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string
             if note == "---" or note == "OFF" then return end
-            song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string = string.gsub(note, "#", "-")
+            patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string = string.gsub(note, "#", "-")
         end
         self.current[data[2]].value = Push.light.note_val.off
     end
@@ -453,12 +491,15 @@ function State:insertNote (data)
     --renoise note value 0 = C-0 119, = B-9
     if data[3] == 0 then return false end
     if not song.transport.edit_mode then return false end
-    if song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER or song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return false end
+    if song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER
+    or song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return false end
     local note
     local line
     local no_funny_business
     local str
     local sharp = "-"
+    local patrn = song.patterns[self.activePattern]
+    local trk = self.activeTrack
     if data[1] == 144 then
         note = self.note_table[(data[2] - 36) % 8]
         line = math.floor((99 - data[2]) / 8)
@@ -466,13 +507,13 @@ function State:insertNote (data)
         line = 7 - (data[2] - 36)
         sharp = "#"
     end
-    if song.patterns[self.activePattern].number_of_lines < 9 or self.activeLine < 4 then
+    if patrn.number_of_lines < 9 or self.activeLine < 4 then
         line = line + 1
-        if line > song.patterns[self.activePattern].number_of_lines or line < 1 then return false end
+        if line > patrn.number_of_lines or line < 1 then return false end
         no_funny_business = true
     else
-        if self.activeLine > (song.patterns[self.activePattern].number_of_lines - 4) then
-            line = (song.patterns[self.activePattern].number_of_lines - 7) + line
+        if self.activeLine > (patrn.number_of_lines - 4) then
+            line = (patrn.number_of_lines - 7) + line
             no_funny_business = true
         else
             line = line - 3
@@ -481,40 +522,41 @@ function State:insertNote (data)
     if data[1] == 144 then
         if no_funny_business then
             if note == "OFF" then
-                if note == song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string then
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string = "---"
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].instrument_value = 255
+                if note == patrn.tracks[trk].lines[line].note_columns[1].note_string then
+                    patrn.tracks[trk].lines[line].note_columns[1].note_string = "---"
+                    patrn.tracks[trk].lines[line].note_columns[1].instrument_value = 255
                 else
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string = note
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].instrument_value = self.activeInstrument - 1
+                    patrn.tracks[trk].lines[line].note_columns[1].note_string = note
+                    patrn.tracks[trk].lines[line].note_columns[1].instrument_value = self.activeInstrument - 1
                 end
             elseif note then
                 str = note .. sharp .. song.transport.octave
-                if str == song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string then
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string = "---"
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].instrument_value = 255
+                if str == patrn.tracks[trk].lines[line].note_columns[1].note_string then
+                    patrn.tracks[trk].lines[line].note_columns[1].note_string = "---"
+                    patrn.tracks[trk].lines[line].note_columns[1].instrument_value = 255
                 else
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].note_string = str
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[line].note_columns[1].instrument_value = self.activeInstrument - 1
+                    patrn.tracks[trk].lines[line].note_columns[1].note_string = str
+                    patrn.tracks[trk].lines[line].note_columns[1].instrument_value = self.activeInstrument - 1
                 end
             end
         else
+            local nline = self.activeLine + line
             if note == "OFF" then
-                if note == song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string then
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string = "---"
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].instrument_value = 255
+                if note == patrn.tracks[trk].lines[nline].note_columns[1].note_string then
+                    patrn.tracks[trk].lines[nline].note_columns[1].note_string = "---"
+                    patrn.tracks[trk].lines[nline].note_columns[1].instrument_value = 255
                 else
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string = note
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].instrument_value = self.activeInstrument - 1
+                    patrn.tracks[trk].lines[nline].note_columns[1].note_string = note
+                    patrn.tracks[trk].lines[nline].note_columns[1].instrument_value = self.activeInstrument - 1
                 end
             elseif note then
-                local str = note .. sharp .. song.transport.octave
-                if str == song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string then
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string = "---"
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].instrument_value = 255
+                str = note .. sharp .. song.transport.octave
+                if str == patrn.tracks[trk].lines[nline].note_columns[1].note_string then
+                    patrn.tracks[trk].lines[nline].note_columns[1].note_string = "---"
+                    patrn.tracks[trk].lines[nline].note_columns[1].instrument_value = 255
                 else
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].note_string = str
-                    song.patterns[self.activePattern].tracks[self.activeTrack].lines[self.activeLine + line].note_columns[1].instrument_value = self.activeInstrument - 1
+                    patrn.tracks[trk].lines[nline].note_columns[1].note_string = str
+                    patrn.tracks[trk].lines[nline].note_columns[1].instrument_value = self.activeInstrument - 1
                 end
             end
         end
