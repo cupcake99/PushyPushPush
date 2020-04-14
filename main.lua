@@ -5,7 +5,8 @@ song = nil
 push = nil
 
 function letsGo ()
-    song = renoise.song()
+    if not song then song = renoise.song() end
+    if not tool then tool = renoise.tool() end
 
     require "utils"
     require "push"
@@ -13,7 +14,7 @@ function letsGo ()
     require "modes"
     require "midi"
 
-    push = Push()
+    if not push then push = Push() end
     push:start()
 end
 
