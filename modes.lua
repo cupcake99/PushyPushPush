@@ -63,12 +63,21 @@ Modes.sequencer = {
             elseif control.hasNote and control.note > 35 and control.note < 100 then
                 if self.push.state:insertNote(data) then
                     self.push.state:setPatternDisplay({0, 0, 1})
-                -- else
-                --     self.push.state:receiveNote(data)
+                else
+                    self.push.state:receiveNote(data)
                 end
             end
         elseif data[1] == Midi.status.note_off then
-            -- self.push.state:receiveNote(data)
+            control, index = getControlFromType("note", data[2])
+            if control.hasNote and control.note < 36 then
+                return
+            elseif control.hasNote and control.note > 35 and control.note < 100 then
+                if song.transport.edit_mode then
+                    return
+                else
+                    self.push.state:receiveNote(data)
+                end
+            end
         elseif data[1] == Midi.status.cc then
             control, index = getControlFromType("cc", data[2])
             if control.hasCC and control.cc > 35 and control.cc < 44 then
