@@ -53,7 +53,9 @@ Midi.sysex = {
     },
 
     -- offset for each 'zone' under the encoders - sequential 1-8
-    zone = { 0, 9, 17, 26, 34, 43, 51, 60 }
+    zone = { 0, 9, 17, 26, 34, 43, 51, 60 },
+
+    user_mode = { 240, 71, 127, 21, 98, 0, 1, 1, 247 }
 }
 
 function Midi:handleMidi (data)

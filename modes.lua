@@ -63,8 +63,9 @@ Modes.sequencer = {
             elseif control.hasNote and control.note > 35 and control.note < 100 then
                 if self.push.state:insertNote(data) then
                     self.push.state:setPatternDisplay({0, 0, 1})
+                -- else
+                --     self.push.state:receiveNote(data)
                 end
-                -- self.push.state:receiveNote(data)
             end
         elseif data[1] == Midi.status.note_off then
             -- self.push.state:receiveNote(data)
@@ -78,6 +79,7 @@ Modes.sequencer = {
                 else
                     self.push.state:changePattern(data)
                 end
+                self.push.state:setPatternDisplay({0, 0, 1})
             elseif control.name == "swing" and control.hasCC then
                 if self.push.state:setLine(data) then
                     self.push.state:setPatternDisplay(data)
@@ -99,6 +101,7 @@ Modes.sequencer = {
                 end
             elseif ((control.name == "csr_left" or control.name == "csr_right") or control.name == "dial1") then
                 self.push.state:changeTrack(data)
+                self.push.state:setPatternDisplay({0, 0, 1})
             elseif control.name == "dial2" then
                 self.push.state:changeInstrument(data)
             elseif control.name == "dial3" then

@@ -303,6 +303,7 @@ function State:setActiveTrack ()
         self.activeTrack = song.selected_track_index
         -- print("Track: ", self.activeTrack)
         self.display.line[1].zone[1] = song.tracks[self.activeTrack].name
+        self:setPatternDisplay({0, 0, 1})
         self.dirty = true
     end
 end
@@ -427,7 +428,7 @@ function State:changeInstrument (data)
     end
 end
 
-function State:setSharp (data) --need to block action on notes E and B and set light correctly when adding or deleting notes
+function State:setSharp (data) --need to set light correctly when adding or deleting notes
     if data[3] == 0 then return end
     if not song.transport.edit_mode then return false end
     local note
@@ -452,11 +453,11 @@ function State:setSharp (data) --need to block action on notes E and B and set l
         end
         if no_funny_business then
             note = patrn.tracks[trk].lines[line].note_columns[1].note_string
-            if note == "---" or note == "OFF" then return end
+            if note == "---" or note == "OFF" or string.find(note, "[EB]%-%d") then return end
             patrn.tracks[trk].lines[line].note_columns[1].note_string = string.gsub(note, "-", "#")
         else
             note = patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string
-            if note == "---" or note == "OFF" then return end
+            if note == "---" or note == "OFF" or string.find(note, "[EB]%-%d") then return end
             patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string = string.gsub(note, "-", "#")
         end
         self.current[data[2]].value = Push.light.note_val.orange
