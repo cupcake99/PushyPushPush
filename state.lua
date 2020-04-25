@@ -174,7 +174,7 @@ function State:setPatternDisplay (data)
     end
     if song.patterns[patt].number_of_lines < 9 then
         for i = 0, 7 do
-            self.current[(92 - ((self.activeLine - 1) * 8)) + i].value = Push.light.pad.pale_mint_blue
+            self.current[(92 - ((self.activeLine - 1) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
         end
         if song.patterns[patt].is_empty then return end
         if song.tracks[trk].type == renoise.Track.TRACK_TYPE_MASTER
@@ -183,7 +183,7 @@ function State:setPatternDisplay (data)
             if song.patterns[patt].tracks[trk].lines[i]:note_column(1).note_string ~= "---" then
                 line = song.patterns[patt].tracks[trk].lines[i]:note_column(1)
                 note = self.note_table[string.sub(line.note_string, 1, 1)]
-                self.current[(92 - ((i - 1) * 8)) + note].value = Push.light.pad.super_blue
+                self.current[(92 - ((i - 1) * 8)) + 128 + note].value = Push.light.pad.super_blue
             end
         end
     else
