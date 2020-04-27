@@ -33,6 +33,22 @@ Modes.sequencer = {
                 elseif control[i].name == "x8" then current[i].value = Push.light.button.off
                 elseif control[i].name == "x4t" then current[i].value = Push.light.button.off
                 elseif control[i].name == "x4" then current[i].value = Push.light.button.off
+                elseif control[i].name == "softkey1A" then current[i].value = Push.light.note_val.dim_yellow
+                elseif control[i].name == "softkey2A" then current[i].value = Push.light.note_val.dim_yellow
+                elseif control[i].name == "softkey3A" then current[i].value = Push.light.note_val.dim_yellow
+                elseif control[i].name == "softkey4A" then current[i].value = Push.light.note_val.dim_yellow
+                elseif control[i].name == "softkey5A" then current[i].value = Push.light.note_val.dim_yellow
+                elseif control[i].name == "softkey6A" then current[i].value = Push.light.note_val.dim_yellow
+                elseif control[i].name == "softkey7A" then current[i].value = Push.light.note_val.dim_yellow
+                elseif control[i].name == "softkey8A" then current[i].value = Push.light.note_val.dim_yellow
+                elseif control[i].name == "softkey1B" then current[i].value = Push.light.pad.light_grey
+                elseif control[i].name == "softkey2B" then current[i].value = Push.light.pad.light_grey
+                elseif control[i].name == "softkey3B" then current[i].value = Push.light.pad.light_grey
+                elseif control[i].name == "softkey4B" then current[i].value = Push.light.pad.light_grey
+                elseif control[i].name == "softkey5B" then current[i].value = Push.light.pad.light_grey
+                elseif control[i].name == "softkey6B" then current[i].value = Push.light.pad.light_grey
+                elseif control[i].name == "softkey7B" then current[i].value = Push.light.pad.light_grey
+                elseif control[i].name == "softkey8B" then current[i].value = Push.light.pad.light_grey
                 elseif control[i].name == "mute" then
                     current[i].value = ((song.tracks[trk].mute_state ~= 1)
                     and Push.light.button.high + Push.light.blink.slow) or Push.light.button.low
@@ -49,10 +65,18 @@ Modes.sequencer = {
     end,
     display = function (self)
         local display = self.push.state.display
-        display.line[1].zone[1] = song.tracks[self.push.state.activeTrack].name
-        display.line[1].zone[2] = (song.selected_instrument.name == "" and "un-named") or song.selected_instrument.name
-        display.line[1].zone[3] = " Length:"
-        display.line[2].zone[3] = "   " .. song.patterns[self.push.state.activePattern].number_of_lines
+        local z = 1
+        for i = self.push.state.trackRange.from, self.push.state.trackRange.to do
+            if i == self.push.state.activeTrack then
+                display.line[1].zone[z] = ">" .. song.tracks[i].name
+            else
+                display.line[1].zone[z] = song.tracks[i].name
+            end
+            z = z + 1
+        end
+        display.line[2].zone[2] = (song.selected_instrument.name == "" and "un-named") or song.selected_instrument.name
+        display.line[2].zone[3] = " Length:"
+        display.line[3].zone[3] = "   " .. song.patterns[self.push.state.activePattern].number_of_lines
     end,
     action = function (self, data)
         local control, index
@@ -108,9 +132,18 @@ Modes.sequencer = {
                 if self.push.state:setLine(data) then
                     self.push.state:setPatternDisplay(data)
                 end
-            elseif ((control.name == "csr_left" or control.name == "csr_right") or control.name == "dial1") then
-                self.push.state:changeTrack(data)
-                self.push.state:setPatternDisplay({0, 0, 1})
+            elseif control.name == "csr_left" or
+                control.name == "csr_right" or--[[or control.name == "dial1"]]
+                control.name == "softkey1A" or
+                control.name == "softkey2A" or
+                control.name == "softkey3A" or
+                control.name == "softkey4A" or
+                control.name == "softkey5A" or
+                control.name == "softkey6A" or
+                control.name == "softkey7A" or
+                control.name == "softkey8A" then
+                    self.push.state:changeTrack(data)
+                    self.push.state:setPatternDisplay({0, 0, 1})
             elseif control.name == "dial2" then
                 self.push.state:changeInstrument(data)
             elseif control.name == "dial3" then

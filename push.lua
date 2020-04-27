@@ -2,7 +2,7 @@ class "Push"
 -- representation of the physical Push device, and methods to initialise the device and tool
 
 function Push:__init ()
-    self.device_name = Push.device_name
+    self.device_name = Push:findDeviceName()
     self.output = {}
     self.input = {}
     self.encoderStream = {}
@@ -10,8 +10,6 @@ function Push:__init ()
     self.state = State(self)
     self.modes = Modes(self)
 end
-
-Push.device_name = "Ableton Push"
 
 -- CC value for the various lighting modes of the button LEDs. Blink value can be added to a button or note_val light to make it blink. Pad light can be set to various animated modes by changing the channel of the note sent to Push.
 Push.light = {
@@ -264,23 +262,24 @@ Push.control = {
     [140] = { name="bender",       cc=0,   note=12,  value=nil,                   hasCC=false, hasNote=true,  hasLED=false }
 }
 
+Push.device_by_platform = { WINDOWS = "MIDIIN2 %(Ableton Push%)%s*%d*", MACINTOSH = "Ableton Push %(User Port%)", LINUX = "Ableton Push%s*%d*:1" }
+
+function Push:findDeviceName()
+    local name
+    for _, device in ipairs(renoise.Midi.available_output_devices()) do
+        name = string.match(device, Push.device_by_platform[os.platform()])
+        if name then
+            return name
+        end
+    end
+end
+
 function Push:open ()
-    if not (table.find(renoise.Midi.available_output_devices(), self.device_name) or
-    table.find(renoise.Midi.available_output_devices(), self.device_name .. " (Live Port)")) then
+    if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
         return false
     end
 
-    for i=1, #renoise.Midi.available_output_devices() do
-        if string.find(renoise.Midi.available_output_devices()[i], Push.device_name) then
-            self.device_name = renoise.Midi.available_output_devices()[i]
-                if string.find(self.device_name, "(Live Port)") then
-                    self.device_name = renoise.Midi.available_output_devices()[i+1]
-                end
-            break
-        end
-    end
-
-    if self.output.is_open then
+    if (not table.is_empty(self.output)) and self.output.is_open then
         self.output:close()
         print("closing output")
     end
@@ -288,7 +287,7 @@ function Push:open ()
     self.output = renoise.Midi.create_output_device(self.device_name)
     print("opening output", self.output.name)
 
-    if self.input.is_open then
+    if (not table.is_empty(self.input)) and self.input.is_open then
         self.input:close()
         print("closing input")
     end

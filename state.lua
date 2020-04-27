@@ -7,6 +7,7 @@ function State:__init (parent)
     self.activeSeqIndex = nil
     self.activePattern = nil
     self.activeTrack = nil
+    self.trackRange = nil
     self.activeLine = nil
     self.activeInstrument = nil
     self.instrumentCount = 0
@@ -30,9 +31,22 @@ function State:getState ()
     self.activeSeqIndex = song.selected_sequence_index
     self.activePattern = song.selected_pattern_index
     self.activeTrack = song.selected_track_index
+    self:getTrackRange()
     self.activeLine = song.selected_line_index
     self.activeInstrument = song.selected_instrument_index
     self:getInstrumentCount()
+end
+
+function State:getTrackRange ()
+    if self.activeTrack <= 8 then
+        self.trackRange = { from = 1, to = song.sequencer_track_count }
+    else
+        if self.activeTrack + 7 <= song.sequencer_track_count then
+            self.trackRange = { from = self.activeTrack, to = self.activeTrack + 7 }
+        else
+            self.trackRange = { from = song.sequencer_track_count - 7, to = song.sequencer_track_count }
+        end
+    end
 end
 
 function State:getInstrumentCount ()
@@ -302,7 +316,17 @@ function State:setActiveTrack ()
     if self.activeTrack ~= song.selected_track_index then
         self.activeTrack = song.selected_track_index
         -- print("Track: ", self.activeTrack)
-        self.display.line[1].zone[1] = song.tracks[self.activeTrack].name
+        -- self.display.line[1].zone[1] = song.tracks[self.activeTrack].name
+        local z = 1
+        self:getTrackRange()
+        for i = self.trackRange.from, self.trackRange.to do
+            if i == self.activeTrack then
+                self.display.line[1].zone[z] = ">" .. song.tracks[i].name
+            else
+                self.display.line[1].zone[z] = song.tracks[i].name
+            end
+            z = z + 1
+        end
         self:setPatternDisplay({0, 0, 1})
         self.dirty = true
     end
@@ -312,7 +336,7 @@ function State:setActiveInstrument ()
     if self.activeInstrument ~= song.selected_instrument_index then
         self.activeInstrument = song.selected_instrument_index
         -- print("Instrument: ", self.activeInstrument)
-        self.display.line[1].zone[2] = (
+        self.display.line[2].zone[2] = (
             song.selected_instrument.name == "" and "un-named"
             ) or song.selected_instrument.name
         self.dirty = true
@@ -387,31 +411,36 @@ function State:changePatternLength (data)
         if value < 1 then value = 1 end
         song.patterns[self.activePattern].number_of_lines = value
     end
-    self.display.line[1].zone[3] = " Length:"
-    self.display.line[2].zone[3] = "   " .. value
+    self.display.line[2].zone[3] = " Length:"
+    self.display.line[3].zone[3] = "   " .. value
 end
 
 function State:changeTrack (data)
     if data[3] == 0 then return end
-    local direction
-    if data[2] == 71 then
-        direction = self.push.midi:encoderParse(data, 8)
+    if data[2] >= 20 and data[2] <= 27 then
+        song.selected_track_index = (data[2] - 20) + self.trackRange.from
+        self:setActiveTrack()
     else
+        local direction
+        -- if data[2] == 71 then
+        --     direction = self.push.midi:encoderParse(data, 8)
+        -- else
         direction = (data[2] == 45 and 1) or -1
+        -- end
+        -- if direction == 0 then return end
+        if direction == 1 then
+            if self.activeTrack == song.sequencer_track_count then return end
+            -- self.current[44].value = (self.current[44].value == 0 and Push.light.button.low) or self.current[44].value
+            song:select_next_track()
+        elseif direction == -1 then
+            if self.activeTrack == 1 then return end
+            -- self.current[45].value = (self.current[45].value == 0 and Push.light.button.low) or self.current[45].value
+            song:select_previous_track()
+        end
     end
-    if direction == 0 then return end
-    if direction >= 1 then
-        if self.activeTrack == song.sequencer_track_count + song.send_track_count + 1 then return end
-        self.current[45].value = (self.activeTrack + 1 == (song.sequencer_track_count + song.send_track_count + 1)
-        and Push.light.button.off) or Push.light.button.low
-        self.current[44].value = (self.current[44].value == 0 and Push.light.button.low) or self.current[44].value
-        song:select_next_track()
-    elseif direction < 0 then
-        if self.activeTrack == 1 then return end
-        self.current[44].value = (self.activeTrack - 1 == 1 and Push.light.button.off) or Push.light.button.low
-        self.current[45].value = (self.current[45].value == 0 and Push.light.button.low) or self.current[45].value
-        song:select_previous_track()
-    end
+    self.current[45].value = (self.activeTrack == (song.sequencer_track_count)
+    and Push.light.button.off) or Push.light.button.low
+    self.current[44].value = (self.activeTrack == 1 and Push.light.button.off) or Push.light.button.low
 end
 
 function State:changeInstrument (data)

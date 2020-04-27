@@ -137,6 +137,8 @@ function Midi:formatLine (format, text, ...)
             for i = length, 8 do
                 text = text .. " "
             end
+        elseif length > 8 then
+            text = string.gsub(text, "%s*", "")
         end
         for i = Midi.sysex.zone[zone], Midi.sysex.zone[zone] + 7  do
             s[9 + i] = string.byte(text, 1 + j)
