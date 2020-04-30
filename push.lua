@@ -262,19 +262,23 @@ Push.control = {
     [140] = { name="bender",       cc=0,   note=12,  value=nil,                   hasCC=false, hasNote=true,  hasLED=false }
 }
 
-Push.device_by_platform = { WINDOWS = "MIDIIN2 %(Ableton Push%)%s*%d*", MACINTOSH = "Ableton Push %(User Port%)", LINUX = "Ableton Push%s*%d*:1" }
+Push.device_by_platform = { WINDOWS = "MIDIIN2%s*%(Ableton%s*Push%)%s*%d*", MACINTOSH = "Ableton Push %(User Port%)", LINUX = "Ableton Push%s*%d*:1" }
 
 function Push:findDeviceName()
     local name
-    for _, device in ipairs(renoise.Midi.available_output_devices()) do
+    for i, device in ipairs(renoise.Midi.available_output_devices()) do
         name = string.match(device, Push.device_by_platform[os.platform()])
         if name then
-            return name
+            return renoise.Midi.available_output_devices()[i]
         end
     end
+    -- failed to match Push name
+    return "no push for you"
 end
 
 function Push:open ()
+    if self.device_name == "no push for you" then return false end
+
     if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
         return false
     end
