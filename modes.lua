@@ -60,7 +60,8 @@ Modes.sequencer = {
                 end
             end
             index = i + 128
-            if current[index] and current[index].hasNote and current[index].hasLED then current[index].value = 1 end
+            -- if current[index] and current[index].hasNote and current[index].hasLED then current[index].value = 1 end
+            self.push.state:setPatternDisplay({0, 0, 1})
         end
     end,
     display = function (self)
@@ -114,7 +115,7 @@ Modes.sequencer = {
                 end
                 self.push.state:setPatternDisplay({0, 0, 1})
             elseif control.name == "swing" and control.hasCC then
-                if self.push.state:setLine(data) then
+                if self.push.state:setEditPos(data) then
                     self.push.state:setPatternDisplay(data)
                 end
             elseif control.name == "volume" then
@@ -129,7 +130,7 @@ Modes.sequencer = {
                     and Push.light.button.high + Push.light.blink.slow) or Push.light.button.low
                 end
             elseif control.name == "csr_up" or control.name == "csr_down" then
-                if self.push.state:setLine(data) then
+                if self.push.state:setEditPos(data) then
                     self.push.state:setPatternDisplay(data)
                 end
             elseif control.name == "csr_left" or

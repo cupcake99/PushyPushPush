@@ -8,7 +8,8 @@ function State:__init (parent)
     self.activePattern = nil
     self.activeTrack = nil
     self.trackRange = nil
-    self.activeLine = nil
+    self.editPos = nil
+    self.playbackPos = nil
     self.activeInstrument = nil
     self.instrumentCount = 0
     self.display = {
@@ -25,6 +26,7 @@ function State:__init (parent)
     self.shiftActive = false
     self.dirty = false
     self.noteOns = {}
+    self.noteDelta = nil
 end
 
 function State:getState ()
@@ -32,7 +34,7 @@ function State:getState ()
     self.activePattern = song.selected_pattern_index
     self.activeTrack = song.selected_track_index
     self:getTrackRange()
-    self.activeLine = song.selected_line_index
+    self.editPos = song.selected_line_index
     self.activeInstrument = song.selected_instrument_index
     self:getInstrumentCount()
 end
@@ -115,7 +117,7 @@ function State:edit (data)
 end
 
 
-function State:setLine (data)
+function State:setEditPos (data)
     local pos = song.transport.edit_pos
     if pos == nil then return false end
     local shift_mult = (self.shiftActive and 10) or 1
@@ -151,15 +153,15 @@ function State:setLine (data)
             pos.line = song.patterns[self.activePattern].number_of_lines
         end
     end
-    self.activeLine = pos.line
-    if song.transport.follow_player and not song.transport.edit_mode then
-        song.transport.playback_pos = pos
-    else
+    self.editPos = pos.line
+    -- if song.transport.follow_player and not song.transport.edit_mode then
+        -- song.transport.playback_pos = pos
+    -- else
         song.transport.edit_pos = pos
-    end
-    if self.activeLine == 1 then -- fix checking when song.transport.wrapped_pattern_edit is true else lights weird on crossing sequence boundaries
+    -- end
+    if self.editPos == 1 then -- fix checking when song.transport.wrapped_pattern_edit is true else lights weird on crossing sequence boundaries
         self.current[46].value = Push.light.button.off
-    elseif self.activeLine == song.patterns[self.activePattern].number_of_lines then
+    elseif self.editPos == song.patterns[self.activePattern].number_of_lines then
         self.current[47].value = Push.light.button.off
     else
         self.current[46].value = Push.light.button.low
@@ -168,11 +170,14 @@ function State:setLine (data)
     return true
 end
 
+function State:setPlaybackPos ()
+
+end
+
 function State:setPatternDisplay (data)
     if data[3] == 0 then return end
-    -- local pos = setLine(self, data)
     if self.activePattern == nil then return end
-    if self.activeLine > song.patterns[self.activePattern].number_of_lines then
+    if self.editPos > song.patterns[self.activePattern].number_of_lines then
         print("[PushyPushPush] ERROR: Invalid Line Index for setPatternDisplay")
         return
     end
@@ -183,12 +188,12 @@ function State:setPatternDisplay (data)
     for i = 36, 99 do
         i = i + 128
         if self.current[i] and self.current[i].hasLED then
-            self.current[i].value = 1
+            self.current[i].value = Push.light.pad.dark_grey
         end
     end
     if song.patterns[patt].number_of_lines < 9 then
         for i = 0, 7 do
-            self.current[(92 - ((self.activeLine - 1) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
+            self.current[(92 - ((self.editPos - 1) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
         end
         if song.patterns[patt].is_empty then return end
         if song.tracks[trk].type == renoise.Track.TRACK_TYPE_MASTER
@@ -202,12 +207,12 @@ function State:setPatternDisplay (data)
         end
     else
         for i = 0, 7 do
-            if self.activeLine < 5 then
-                self.current[(92 - ((self.activeLine - 1) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
+            if self.editPos < 5 then
+                self.current[(92 - ((self.editPos - 1) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
             elseif song.patterns[patt].number_of_lines > 8
-            and song.patterns[patt].number_of_lines - self.activeLine < 5 then
+            and song.patterns[patt].number_of_lines - self.editPos < 5 then
                 self.current[
-                    (92 - ((7 - (song.patterns[patt].number_of_lines - self.activeLine)) * 8)) + 128 + i
+                    (92 - ((7 - (song.patterns[patt].number_of_lines - self.editPos)) * 8)) + 128 + i
                 ].value = Push.light.pad.pale_mint_blue
             else
                 self.current[68 + 128 + i].value = Push.light.pad.pale_mint_blue
@@ -218,7 +223,7 @@ function State:setPatternDisplay (data)
         or song.tracks[trk].type == renoise.Track.TRACK_TYPE_SEND then
             return
         end
-        local pos = self.activeLine
+        local pos = self.editPos
         if pos < 5 then pos = 4 elseif song.patterns[patt].number_of_lines > 8
         and (pos > song.patterns[patt].number_of_lines - 4) then
             pos = song.patterns[patt].number_of_lines - 4
@@ -357,7 +362,7 @@ function State:changeSequence (data)
         if self.activeSeqIndex == song.transport.song_length.sequence then return end
         if song.patterns[song.sequencer:pattern(self.activeSeqIndex + 1)].number_of_lines
         < song.patterns[self.activePattern].number_of_lines then
-            self.activeLine = song.patterns[song.sequencer:pattern(self.activeSeqIndex + 1)].number_of_lines
+            self.editPos = song.patterns[song.sequencer:pattern(self.activeSeqIndex + 1)].number_of_lines
         end
         if pos then
             song.transport.edit_pos.sequence = pos.sequence + 1
@@ -368,7 +373,7 @@ function State:changeSequence (data)
         if self.activeSeqIndex == 1 then return end
         if song.patterns[song.sequencer:pattern(self.activeSeqIndex - 1)].number_of_lines
         < song.patterns[self.activePattern].number_of_lines then
-            self.activeLine = song.patterns[song.sequencer:pattern(self.activeSeqIndex - 1)].number_of_lines
+            self.editPos = song.patterns[song.sequencer:pattern(self.activeSeqIndex - 1)].number_of_lines
         end
         if pos then
             song.transport.edit_pos.sequence = pos.sequence - 1
@@ -468,12 +473,12 @@ function State:setSharp (data) --need to set light correctly when adding or dele
     local trk = self.activeTrack
     if data[3] > 0 and self.current[data[2]].value == 0 then
         line = 7 - (data[2] - 36)
-        if patrn.number_of_lines < 9 or self.activeLine < 4 then
+        if patrn.number_of_lines < 9 or self.editPos < 4 then
             line = line + 1
             if line > patrn.number_of_lines or line < 1 then return false end
             no_funny_business = true
         else
-            if self.activeLine > (patrn.number_of_lines - 4) then
+            if self.editPos > (patrn.number_of_lines - 4) then
                 line = (patrn.number_of_lines - 7) + line
                 no_funny_business = true
             else
@@ -485,19 +490,19 @@ function State:setSharp (data) --need to set light correctly when adding or dele
             if note == "---" or note == "OFF" or string.find(note, "[EB]%-%d") then return end
             patrn.tracks[trk].lines[line].note_columns[1].note_string = string.gsub(note, "-", "#")
         else
-            note = patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string
+            note = patrn.tracks[trk].lines[self.editPos + line].note_columns[1].note_string
             if note == "---" or note == "OFF" or string.find(note, "[EB]%-%d") then return end
-            patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string = string.gsub(note, "-", "#")
+            patrn.tracks[trk].lines[self.editPos + line].note_columns[1].note_string = string.gsub(note, "-", "#")
         end
         self.current[data[2]].value = Push.light.note_val.orange
     else
         line = 7 - (data[2] - 36)
-        if patrn.number_of_lines < 9 or self.activeLine < 4 then
+        if patrn.number_of_lines < 9 or self.editPos < 4 then
             line = line + 1
             if line > patrn.number_of_lines or line < 1 then return false end
             no_funny_business = true
         else
-            if self.activeLine > (patrn.number_of_lines - 4) then
+            if self.editPos > (patrn.number_of_lines - 4) then
                 line = (patrn.number_of_lines - 7) + line
                 no_funny_business = true
             else
@@ -509,9 +514,9 @@ function State:setSharp (data) --need to set light correctly when adding or dele
             if note == "---" or note == "OFF" then return end
             patrn.tracks[trk].lines[line].note_columns[1].note_string = string.gsub(note, "#", "-")
         else
-            note = patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string
+            note = patrn.tracks[trk].lines[self.editPos + line].note_columns[1].note_string
             if note == "---" or note == "OFF" then return end
-            patrn.tracks[trk].lines[self.activeLine + line].note_columns[1].note_string = string.gsub(note, "#", "-")
+            patrn.tracks[trk].lines[self.editPos + line].note_columns[1].note_string = string.gsub(note, "#", "-")
         end
         self.current[data[2]].value = Push.light.note_val.off
     end
@@ -530,26 +535,28 @@ function State:insertNote (data)
     local sharp = "-"
     local patrn = song.patterns[self.activePattern]
     local trk = self.activeTrack
+    local delta = os.clock()
     if data[1] == 144 then
         note = self.note_table[(data[2] - 36) % 8]
         line = math.floor((99 - data[2]) / 8)
-    elseif data[1] == 176 then
-        line = 7 - (data[2] - 36)
-        sharp = "#"
+        if self.noteDelta and (delta - self.noteDelta) < 0.4 then
+            -- print(delta - self.noteDelta)
+            if note ~= "E" and note ~= "B" then sharp = "#" end
+        end
     end
-    if patrn.number_of_lines < 9 or self.activeLine < 4 then
+    if patrn.number_of_lines < 9 or self.editPos < 4 then
         line = line + 1
         if line > patrn.number_of_lines or line < 1 then return false end
         no_funny_business = true
     else
-        if self.activeLine > (patrn.number_of_lines - 4) then
+        if self.editPos > (patrn.number_of_lines - 4) then
             line = (patrn.number_of_lines - 7) + line
             no_funny_business = true
         else
             line = line - 3
         end
     end
-    if data[1] == 144 then
+    if data[1] == 144 then --find way to delete note on press when string has a sharp
         if no_funny_business then
             if note == "OFF" then
                 if note == patrn.tracks[trk].lines[line].note_columns[1].note_string then
@@ -570,7 +577,7 @@ function State:insertNote (data)
                 end
             end
         else
-            local nline = self.activeLine + line
+            local nline = self.editPos + line
             if note == "OFF" then
                 if note == patrn.tracks[trk].lines[nline].note_columns[1].note_string then
                     patrn.tracks[trk].lines[nline].note_columns[1].note_string = "---"
@@ -591,6 +598,7 @@ function State:insertNote (data)
             end
         end
     end
+    self.noteDelta = delta
     return true
     --set current line if flag is true
     --play note if flag is true
