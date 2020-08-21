@@ -2,9 +2,9 @@ class "Push"
 -- representation of the physical Push device, and methods to initialise the device and tool
 
 function Push:__init ()
-    self.device_name = Push:findDeviceName()
-    self.output = {}
-    self.input = {}
+    self.device_name = nil
+    self.output = nil
+    self.input = nil
     self.encoderStream = {}
     self.midi = Midi(self)
     self.state = State(self)
@@ -264,44 +264,54 @@ Push.control = {
 
 Push.device_by_platform = { WINDOWS = "MIDIIN2%s*%(Ableton%s*Push%)%s*%d*", MACINTOSH = "Ableton Push %(User Port%)", LINUX = "Ableton Push%s*%d*:1" }
 
-function Push:findDeviceName()
+function Push:findDevice()
     local name
     for i, device in ipairs(renoise.Midi.available_output_devices()) do
         name = string.match(device, Push.device_by_platform[os.platform()])
         if name then
-            return renoise.Midi.available_output_devices()[i]
+            self.device_name = renoise.Midi.available_output_devices()[i]
+            return true
         end
     end
-    -- failed to match Push name
-    return "no push for you"
+--unable to find a Push
+    self.device_name = nil
+    return false
+end
+
+function Push:watchMidiDevices()
+    if not Push:findDevice() then
+        self:stop()
+        self:start()
+    end
 end
 
 function Push:open ()
-    if self.device_name == "no push for you" then return false end
+    if Push:findDevice() then
+        if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
+            return false
+        end
 
-    if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
-        return false
+        if self.output and self.output.is_open then
+            self.output:close()
+            print("closing output")
+        end
+
+        self.output = renoise.Midi.create_output_device(self.device_name)
+        print("opening output", self.output.name)
+
+        if self.input and self.input.is_open then
+            self.input:close()
+            print("closing input")
+        end
+
+        self.input = renoise.Midi.create_input_device(self.device_name, {self.midi, Midi.handleMidi})
+        print("opening input", self.input.name)
+
+        self.midi:sendMidi(Midi.sysex.user_mode)
+
+        return true
     end
-
-    if (not table.is_empty(self.output)) and self.output.is_open then
-        self.output:close()
-        print("closing output")
-    end
-
-    self.output = renoise.Midi.create_output_device(self.device_name)
-    print("opening output", self.output.name)
-
-    if (not table.is_empty(self.input)) and self.input.is_open then
-        self.input:close()
-        print("closing input")
-    end
-
-    self.input = renoise.Midi.create_input_device(self.device_name, {self.midi, Midi.handleMidi})
-    print("opening input", self.input.name)
-
-    self.midi:sendMidi(Midi.sysex.user_mode)
-
-    return true
+    return false
 end
 
 function Push:close ()
@@ -339,6 +349,7 @@ function Push:start ()
     self.state.activeMode.lights(self.modes)
     self.state.activeMode.display(self.modes)
     tool.app_idle_observable:add_notifier(self, self.update)
+    renoise.Midi.devices_changed_observable():add_notifier(self, self.watchMidiDevices)
     song.transport.playing_observable:add_notifier(self.state, State.setPlaying)
     song.transport.edit_mode_observable:add_notifier(self.state, State.setEditing)
     song.selected_sequence_index_observable:add_notifier(self.state, State.setSequenceIndex)
@@ -368,11 +379,17 @@ function Push:stop ()
 
     self:close()
 
+    self.output = nil
+    self.input = nil
+
     if tool:has_timer({self, Push.start}) then
         tool:remove_timer({self, Push.start})
     end
     if tool.app_idle_observable:has_notifier(self, self.update) then
         tool.app_idle_observable:remove_notifier(self, self.update)
+    end
+    if renoise.Midi.devices_changed_observable():has_notifier(self, self.watchMidiDevices) then
+        renoise.Midi.devices_changed_observable():remove_notifier(self, self.watchMidiDevices)
     end
     if song.transport.playing_observable:has_notifier(self.state, State.setPlaying) then
         song.transport.playing_observable:remove_notifier(self.state, State.setPlaying)
