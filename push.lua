@@ -315,11 +315,11 @@ function Push:open ()
 end
 
 function Push:close ()
-    if self.output.is_open then
+    if self.output and self.output.is_open then
         self.output:close()
         print("closing output")
     end
-    if self.input.is_open then
+    if self.input and self.input.is_open then
         self.input:close()
         print("closing input")
     end
@@ -364,13 +364,15 @@ function Push:start ()
 end
 
 function Push:stop ()
-    self.midi:clearDisplay()
-    local data, index
-    for i = 0, 128 do
-        data = {Midi.status.cc, i, Push.light.button.off}
-        self.midi:sendMidi(data)
-        data = {Midi.status.note_on, i, Push.light.pad.off}
-        self.midi:sendMidi(data)
+    if self.output then 
+        self.midi:clearDisplay()
+        local data, index
+        for i = 0, 128 do
+            data = {Midi.status.cc, i, Push.light.button.off}
+            self.midi:sendMidi(data)
+            data = {Midi.status.note_on, i, Push.light.pad.off}
+            self.midi:sendMidi(data)
+        end
     end
 
     -- if self.midi.server then

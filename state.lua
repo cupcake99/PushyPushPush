@@ -260,6 +260,7 @@ State.note_table = {
     [7] = "OFF",
 }
 
+-- this is just for the nice touchy lights. hopefully one day it will also help playing notes into renoise
 function State:receiveNote (data)
     local value = data[2] + 128
     if data[1] == Midi.status.note_on then
