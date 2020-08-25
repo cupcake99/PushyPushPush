@@ -1,8 +1,7 @@
 class "Midi"
 -- library of static functions and tables for MIDI communication and formatting
 
-function Midi:__init (parent)
-    self.push = parent
+function Midi:__init ()
     -- self.server = nil
     -- self.client = nil
     -- self.address = Midi.OSCAddress
@@ -58,7 +57,7 @@ Midi.sysex = {
     user_mode = { 240, 71, 127, 21, 98, 0, 1, 1, 247 }
 }
 
-function Midi:handleMidi (data)
+function Midi.handleMidi (data)
     assert(#data == 3)
     local control
     if data[1] == Midi.status.note_on then control = getControlFromType("note", data[2])
@@ -66,35 +65,35 @@ function Midi:handleMidi (data)
     -- if not control then return end
     -- rprint(control)
     if control and control.hasCC then
-        if control.name == "shift" then self.push.state:shift(data) return end
-        if control.name == "play" then self.push.state:play(data) return end
-        if control.name == "record" then self.push.state:edit(data) return end
-        if self.push.state:changeMode(data) then return end
+        if control.name == "shift" then state:shift(data) return end
+        if control.name == "play" then state:play(data) return end
+        if control.name == "record" then state:edit(data) return end
+        if state:changeMode(data) then return end
     end
-    self.push.state.activeMode.action(self.push.modes, data)
+    state.activeMode.action(data)
 end
 
-function Midi:sendMidi (data)
-    if self.push.output.is_open then
-        self.push.output:send(data)
+function Midi.sendMidi (data)
+    if push.output.is_open then
+        push.output:send(data)
     end
 end
 
-function Midi:encoderParse (data, thinningLevel)
+function Midi.encoderParse (data, thinningLevel)
     if data[3] == 0 then return 0 end
-    if #self.push.encoderStream ~= 0 and self.push.encoderStream[#self.push.encoderStream].cc ~= data[2] then
-        self.push.encoderStream = {}
+    if #push.encoderStream ~= 0 and push.encoderStream[#push.encoderStream].cc ~= data[2] then
+        push.encoderStream = {}
     end
     if thinningLevel then
-        table.insert(self.push.encoderStream, {cc = data[2], value = data[3]})
-        if #self.push.encoderStream == 1 then
-            if self.push.encoderStream[1].value < 64 then
-                return self.push.encoderStream[1].value
+        table.insert(push.encoderStream, {cc = data[2], value = data[3]})
+        if #push.encoderStream == 1 then
+            if push.encoderStream[1].value < 64 then
+                return push.encoderStream[1].value
             else
-                return -1 * (128 - self.push.encoderStream[1].value)
+                return -1 * (128 - push.encoderStream[1].value)
             end
-        elseif #self.push.encoderStream == thinningLevel then
-            self.push.encoderStream = {}
+        elseif #push.encoderStream == thinningLevel then
+            push.encoderStream = {}
         end
         return 0
     else
@@ -102,21 +101,9 @@ function Midi:encoderParse (data, thinningLevel)
     end
 end
 
-function Midi:writeText (data, ...)
-    local n_args = select('#', ...)
-    if data then
-        self:sendMidi(data)
-        if n_args > 0 then
-            local t = {...}
-            local line = t[1]
-            self.push.state.displaySysexByLine[line] = data
-        end
-    end
-end
-
 -- format sysex table for writing to display. Byte 5 is always line number. Can write up to 68 characters long, byte values 0-127.
 -- Function is variadic, (format, text, line, zone). First three are required, zone is optional.
-function Midi:formatLine (format, text, ...)
+function Midi.formatLine (format, text, ...)
     local s = table.copy(format)
     local length = string.len(text)
     local n_args = select('#', ...)
@@ -153,18 +140,30 @@ function Midi:formatLine (format, text, ...)
     end
 end
 
+function Midi:writeText (data, ...)
+    local n_args = select('#', ...)
+    if data then
+        self.sendMidi(data)
+        if n_args > 0 then
+            local t = {...}
+            local line = t[1]
+            state.displaySysexByLine[line] = data
+        end
+    end
+end
+
 -- clear the whole display. Takes an object as argument (the Push object), to access MIDI operations. Line number is optional.
 function Midi:clearDisplay (...)
     local m = {}
     if select('#', ...) == 1 then
         m = table.copy(Midi.sysex.clear_line)
         m[5] = Midi.sysex.line_number.clear[select(1, ...)]
-        self:sendMidi(m)
+        self.sendMidi(m)
     else
         for i = 1, 4 do
             m[i] = table.copy(Midi.sysex.clear_line)
             m[i][5] = Midi.sysex.line_number.clear[i]
-            self:sendMidi(m[i])
+            self.sendMidi(m[i])
         end
     end
 end

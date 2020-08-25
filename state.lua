@@ -1,9 +1,28 @@
+local note_table = {
+    ["C"] = 0,
+    ["D"] = 1,
+    ["E"] = 2,
+    ["F"] = 3,
+    ["G"] = 4,
+    ["A"] = 5,
+    ["B"] = 6,
+    ["O"] = 7,
+    [0] = "C",
+    [1] = "D",
+    [2] = "E",
+    [3] = "F",
+    [4] = "G",
+    [5] = "A",
+    [6] = "B",
+    [7] = "OFF",
+}
+
 class "State"
 -- representation of the state of the Renoise song and methods to change parameters within it
 
-function State:__init (parent)
-    self.push = parent
+function State:__init ()
     self.activeMode = nil
+    self.activePage = 0
     self.activeSeqIndex = nil
     self.activePattern = nil
     self.activeTrack = nil
@@ -21,8 +40,8 @@ function State:__init (parent)
         }
     }
     self.displaySysexByLine = {}
-    self.current = table.rcopy(Push.control)
-    self.last = table.rcopy(self.current)
+    self.current = setmetatable({}, {__index = Push.control})
+    self.last = table.copy(self.current)
     self.shiftActive = false
     self.dirty = false
     self.noteOns = {}
@@ -59,15 +78,33 @@ function State:getInstrumentCount ()
     if self.instrumentCount ~= instrumentCt then self.instrumentCount = instrumentCt end
 end
 
+function State:loadMode (cc)
+    local page, mode = 1, modes:select(cc)
+    if mode then
+        if mode.name == self.activeMode.name then
+            if self.activePage == #mode.page then page = 1 else
+                page = self.activePage + 1 <= #mode.page and self.activePage + 1
+            end
+            if not page then return end --see if page can change, if not mode and page is already loaded so exit
+        end
+        for i = 1, 120 do
+            self.current[i] = nil
+            if mode.page[page][i] then
+                self.current[i] = mode.page[page][i]
+            end
+        end
+        mode.page[page].display()
+        self.activeMode = {name = mode.name, action = mode.page[page].action}
+        self.activePage = page
+        return true
+    end
+    return false
+end
+
 function State:changeMode (data)
-    if not self.activeMode then return false end
-    local mode = self.push.modes.select[data[2]]
-    if not mode then return false end
-    -- if self.push.modes.select[data[2]].cc == data[2] then return false end
-    if self.activeMode.name ~= mode.name and data[3] > 1 then
-        self.activeMode = mode
-        self.activeMode.lights(self.push.modes)
-        self.activeMode.display(self.push.modes)
+    if data[3] > 1 then
+        if not self:loadMode(data[2]) then return false end
+        self:setPatternDisplay {0,0,1}
         self.dirty = true
     end
     return true
@@ -122,7 +159,7 @@ function State:setEditPos (data)
     if pos == nil then return false end
     local shift_mult = (self.shiftActive and 10) or 1
     if data[2] == 15 then
-        local encoderVal = self.push.midi:encoderParse(data, 7)
+        local encoderVal = midi:encoderParse(data, 7)
         if encoderVal == 0 then return nil end
         pos.line = pos.line + encoderVal * shift_mult
     elseif (data[2] == 46 or data[2] == 47) and data[3] > 0 then
@@ -201,7 +238,7 @@ function State:setPatternDisplay (data)
         for i = 1, song.patterns[patt].number_of_lines do
             if song.patterns[patt].tracks[trk].lines[i]:note_column(1).note_string ~= "---" then
                 line = song.patterns[patt].tracks[trk].lines[i]:note_column(1)
-                note = self.note_table[string.sub(line.note_string, 1, 1)]
+                note = note_table[string.sub(line.note_string, 1, 1)]
                 self.current[(92 - ((i - 1) * 8)) + 128 + note].value = Push.light.pad.super_blue
             end
         end
@@ -232,7 +269,7 @@ function State:setPatternDisplay (data)
         for i = pos - 3, pos + 4 do
             if song.patterns[patt].tracks[trk].lines[i] then
                 line = song.patterns[patt].tracks[trk].lines[i]:note_column(1)
-                note = self.note_table[string.sub(line.note_string, 1, 1)]
+                note = note_table[string.sub(line.note_string, 1, 1)]
             end
             if note then self.current[(92 - (j * 8)) + 128 + note].value = Push.light.pad.super_blue end
             j = j + 1
@@ -240,25 +277,6 @@ function State:setPatternDisplay (data)
     end
 
 end
-
-State.note_table = {
-    ["C"] = 0,
-    ["D"] = 1,
-    ["E"] = 2,
-    ["F"] = 3,
-    ["G"] = 4,
-    ["A"] = 5,
-    ["B"] = 6,
-    ["O"] = 7,
-    [0] = "C",
-    [1] = "D",
-    [2] = "E",
-    [3] = "F",
-    [4] = "G",
-    [5] = "A",
-    [6] = "B",
-    [7] = "OFF",
-}
 
 -- this is just for the nice touchy lights. hopefully one day it will also help playing notes into renoise
 function State:receiveNote (data)
@@ -275,7 +293,7 @@ end
 function State:setMasterVolume (data)
     local shift_mult = (self.shiftActive and 0.1) or 1
     local masterTrack = song.tracks[song.sequencer_track_count + 1]
-    local val = masterTrack.postfx_volume.value + ((self.push.midi:encoderParse(data, 5) * 0.2) * shift_mult)
+    local val = masterTrack.postfx_volume.value + ((midi:encoderParse(data, 5) * 0.2) * shift_mult)
     if val < masterTrack.postfx_volume.value_min then val = masterTrack.postfx_volume.value_min
     elseif val > masterTrack.postfx_volume.value_max then val = masterTrack.postfx_volume.value_max end
     masterTrack.postfx_volume.value = val
@@ -333,7 +351,7 @@ function State:setActiveTrack ()
             end
             z = z + 1
         end
-        self:setPatternDisplay({0, 0, 1})
+        self:setPatternDisplay {0, 0, 1}
         self.dirty = true
     end
 end
@@ -357,7 +375,7 @@ function State:changeSequence (data)
     -- if song.transport.follow_player then
     --     pos = song.transport.playback_pos
     -- end    local pos = (song.transport.follow_player and song.transport.playback_pos) or nil
-    local direction = self.push.midi:encoderParse(data, nil)
+    local direction = midi:encoderParse(data, nil)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activeSeqIndex == song.transport.song_length.sequence then return end
@@ -388,7 +406,7 @@ end
 
 function State:changePattern (data)
     if data[3] == 0 then return end
-    local direction = self.push.midi:encoderParse(data, nil)
+    local direction = midi:encoderParse(data, nil)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activePattern == 999 then return end
@@ -401,7 +419,7 @@ end
 
 function State:changePatternLength (data)
     if data[3] == 0 then return end
-    local direction = self.push.midi:encoderParse(data, 3)
+    local direction = midi:encoderParse(data, 3)
     if direction == 0 then return end
     local lines = song.patterns[self.activePattern].number_of_lines
     local shift_mult = (self.shiftActive and 4) or 1
@@ -429,7 +447,7 @@ function State:changeTrack (data)
     else
         local direction
         -- if data[2] == 71 then
-        --     direction = self.push.midi:encoderParse(data, 8)
+        --     direction = midi:encoderParse(data, 8)
         -- else
         direction = (data[2] == 45 and 1) or -1
         -- end
@@ -451,7 +469,7 @@ end
 
 function State:changeInstrument (data)
     if data[3] == 0 then return end
-    local direction = self.push.midi:encoderParse(data, 8)
+    local direction = midi:encoderParse(data, 8)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activeInstrument == renoise.Song.MAX_NUMBER_OF_INSTRUMENTS
@@ -538,7 +556,7 @@ function State:insertNote (data)
     local trk = self.activeTrack
     local delta = os.clock()
     if data[1] == 144 then
-        note = self.note_table[(data[2] - 36) % 8]
+        note = note_table[(data[2] - 36) % 8]
         line = math.floor((99 - data[2]) / 8)
         if self.noteDelta and (delta - self.noteDelta) < 0.4 then
             -- print(delta - self.noteDelta)
