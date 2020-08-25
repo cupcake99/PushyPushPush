@@ -109,12 +109,14 @@ function State:loadMode (cc)
 end
 
 function State:changeMode (data)
-    if data[3] > 1 then
+    if modes.modes[data[2]] and data[3] > 1 then
         if not self:loadMode(data[2]) then return false end
+        self:loadMode(data[2])
         self:setPatternDisplay {0,0,1}
         self.dirty = true
+        return true
     end
-    return true
+    return false
 end
 
 function State:shift (data)
