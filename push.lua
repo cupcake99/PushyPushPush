@@ -2,9 +2,9 @@ class "Push"
 -- representation of the physical Push device, and methods to initialise the device and tool
 
 function Push:__init ()
-    self.state = State()
-    self.modes = Modes()
-    self.midi = Midi()
+    self._state = State()
+    self._mode = Mode()
+    self._midi = Midi()
     self:setRefs()
     self.device_name = nil
     self.output = nil
@@ -265,13 +265,29 @@ Push.control = {
 
 local device_by_platform = { WINDOWS = "MIDIIN2%s*%(Ableton%s*Push%)%s*%d*", MACINTOSH = "Ableton Push %(User Port%)", LINUX = "Ableton Push%s*%d*:1" }
 
+local sysex_id_pattern = ""
+
 function Push:setRefs ()
-    self.state.setRefs(self)
-    self.modes.setRefs(self)
-    self.midi.setRefs(self)
+    self._state.setRefs(self)
+    self._mode.setRefs(self)
+    self._midi.setRefs(self)
 end
 
-function Push:findDevice()
+function Push:findDeviceByName()
+    local name
+    for i, device in ipairs(renoise.Midi.available_output_devices()) do
+        name = string.match(device, device_by_platform[os.platform()])
+        if name then
+            self.device_name = renoise.Midi.available_output_devices()[i]
+            return true
+        end
+    end
+--unable to find a Push
+    self.device_name = nil
+    return false
+end
+
+function Push:findDeviceBySysex()
     local name
     for i, device in ipairs(renoise.Midi.available_output_devices()) do
         name = string.match(device, device_by_platform[os.platform()])
@@ -286,14 +302,14 @@ function Push:findDevice()
 end
 
 function Push:watchMidiDevices()
-    if not Push:findDevice() then
+    if not Push:findDeviceByName() then
         self:stop()
         self:start()
     end
 end
 
 function Push:open ()
-    if Push:findDevice() then
+    if Push:findDeviceByName() then
         if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
             return false
         end
@@ -314,7 +330,7 @@ function Push:open ()
         self.input = renoise.Midi.create_input_device(self.device_name, Midi.handleMidi)
         print("opening input", self.input.name)
 
-        self.midi.sendMidi(Midi.sysex.user_mode)
+        self._midi.sendMidi(Midi.sysex.user_mode)
 
         return true
     end
@@ -343,42 +359,43 @@ function Push:start ()
         return
     end
     if tool:has_timer {self, Push.start} then tool:remove_timer {self, Push.start} end
-    self.midi:clearDisplay()
-    -- self.midi:initOSC()
-    -- if self.midi.server then
-    --     self.midi:runServer()
+    self._midi:clearDisplay()
+    -- self._midi:initOSC()
+    -- if self._midi.server then
+    --     self._midi:runServer()
     -- end
-    self.state:getState()
-    self.state:changeMode {Midi.status.cc, getControlFromType("name", "note").cc, 127}
+    self._mode:loadModes()
+    self._state:getState()
+    self._state:changeMode {Midi.status.cc, getControlFromType("name", "note").cc, 127}
     tool.app_idle_observable:add_notifier(self, self.update)
     renoise.Midi.devices_changed_observable():add_notifier(self, self.watchMidiDevices)
-    song.transport.playing_observable:add_notifier(self.state, State.setPlaying)
-    song.transport.edit_mode_observable:add_notifier(self.state, State.setEditing)
-    song.selected_sequence_index_observable:add_notifier(self.state, State.setSequenceIndex)
-    song.selected_pattern_index_observable:add_notifier(self.state, State.setActivePattern)
-    song.selected_track_index_observable:add_notifier(self.state, State.setActiveTrack)
-    song.selected_instrument_index_observable:add_notifier(self.state, State.setActiveInstrument)
+    song.transport.playing_observable:add_notifier(self._state, State.setPlaying)
+    song.transport.edit_mode_observable:add_notifier(self._state, State.setEditing)
+    song.selected_sequence_index_observable:add_notifier(self._state, State.setSequenceIndex)
+    song.selected_pattern_index_observable:add_notifier(self._state, State.setActivePattern)
+    song.selected_track_index_observable:add_notifier(self._state, State.setActiveTrack)
+    song.selected_instrument_index_observable:add_notifier(self._state, State.setActiveInstrument)
     printSelf(self)
-    printSelf(self.midi)
-    printSelf(self.modes)
-    printSelf(self.state)
+    printSelf(self._midi)
+    printSelf(self._mode)
+    printSelf(self._state)
 
 end
 
 function Push:stop ()
     if self.output then
-        self.midi:clearDisplay()
+        self._midi:clearDisplay()
         local data, index
         for i = 0, 128 do
             data = {Midi.status.cc, i, Push.light.button.off}
-            self.midi.sendMidi(data)
+            self._midi.sendMidi(data)
             data = {Midi.status.note_on, i, Push.light.pad.off}
-            self.midi.sendMidi(data)
+            self._midi.sendMidi(data)
         end
     end
 
-    -- if self.midi.server then
-    --     self.midi:closeServer()
+    -- if self._midi.server then
+    --     self._midi:closeServer()
     -- end
 
     self:close()
@@ -395,53 +412,53 @@ function Push:stop ()
     if renoise.Midi.devices_changed_observable():has_notifier(self, self.watchMidiDevices) then
         renoise.Midi.devices_changed_observable():remove_notifier(self, self.watchMidiDevices)
     end
-    if song.transport.playing_observable:has_notifier(self.state, State.setPlaying) then
-        song.transport.playing_observable:remove_notifier(self.state, State.setPlaying)
+    if song.transport.playing_observable:has_notifier(self._state, State.setPlaying) then
+        song.transport.playing_observable:remove_notifier(self._state, State.setPlaying)
     end
-    if song.transport.edit_mode_observable:has_notifier(self.state, State.setEditing) then
-        song.transport.edit_mode_observable:remove_notifier(self.state, State.setEditing)
+    if song.transport.edit_mode_observable:has_notifier(self._state, State.setEditing) then
+        song.transport.edit_mode_observable:remove_notifier(self._state, State.setEditing)
     end
-    if song.selected_sequence_index_observable:has_notifier(self.state, State.setSequenceIndex) then
-        song.selected_sequence_index_observable:remove_notifier(self.state, State.setSequenceIndex)
+    if song.selected_sequence_index_observable:has_notifier(self._state, State.setSequenceIndex) then
+        song.selected_sequence_index_observable:remove_notifier(self._state, State.setSequenceIndex)
     end
-    if song.selected_pattern_index_observable:has_notifier(self.state, State.setActivePattern) then
-        song.selected_pattern_index_observable:remove_notifier(self.state, State.setActivePattern)
+    if song.selected_pattern_index_observable:has_notifier(self._state, State.setActivePattern) then
+        song.selected_pattern_index_observable:remove_notifier(self._state, State.setActivePattern)
     end
-    if song.selected_track_index_observable:has_notifier(self.state, State.setActiveTrack) then
-        song.selected_track_index_observable:remove_notifier(self.state, State.setActiveTrack)
+    if song.selected_track_index_observable:has_notifier(self._state, State.setActiveTrack) then
+        song.selected_track_index_observable:remove_notifier(self._state, State.setActiveTrack)
     end
-    if song.selected_instrument_index_observable:has_notifier(self.state, State.setActiveInstrument) then
-        song.selected_instrument_index_observable:remove_notifier(self.state, State.setActiveInstrument)
+    if song.selected_instrument_index_observable:has_notifier(self._state, State.setActiveInstrument) then
+        song.selected_instrument_index_observable:remove_notifier(self._state, State.setActiveInstrument)
     end
 end
 
 function Push:update ()
-    if self.state.dirty then
+    if self._state.dirty then
         local data, dummy, index
         local string = table.copy(Midi.sysex.write_line)
         for i = 1, 120 do
-            if self.state.current[i] and self.state.current[i].hasCC and self.state.current[i].hasLED then
-                data = {Midi.status.cc, self.state.current[i].cc, self.state.current[i].value}
-                self.midi.sendMidi(data)
+            if self._state.current[i] and self._state.current[i].hasCC and self._state.current[i].hasLED then
+                data = {Midi.status.cc, self._state.current[i].cc, self._state.current[i].value}
+                self._midi.sendMidi(data)
             end
             index = i + 128
-            if self.state.current[index] and self.state.current[index].hasNote and self.state.current[index].hasLED then
-                data = {Midi.status.note_on, self.state.current[index].note, self.state.current[index].value}
-                self.midi.sendMidi(data)
+            if self._state.current[index] and self._state.current[index].hasNote and self._state.current[index].hasLED then
+                data = {Midi.status.note_on, self._state.current[index].note, self._state.current[index].value}
+                self._midi.sendMidi(data)
             end
         end
         for i = 1, 4 do
         dummy = string
             for j = 1, 8 do
-                if self.state.display.line[i].zone[j] ~= "" then
-                    string = self.midi.formatLine(string, self.state.display.line[i].zone[j], i, j)
+                if self._state.display.line[i].zone[j] ~= "" then
+                    string = self._midi.formatLine(string, self._state.display.line[i].zone[j], i, j)
                 end
-                if j == 8 and rawequal(string, dummy) then string = self.midi.formatLine(string, "", i)  end
+                if j == 8 and rawequal(string, dummy) then string = self._midi.formatLine(string, "", i)  end
             end
-            self.midi:writeText(string, i)
+            self._midi:writeText(string, i)
             string = table.copy(Midi.sysex.write_line)
         end
-        self.state.dirty = false
+        self._state.dirty = false
     end
 end
 

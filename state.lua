@@ -1,4 +1,4 @@
-local push, modes, midi
+local _push, _mode, _midi
 local note_table = {
     ["C"] = 0,
     ["D"] = 1,
@@ -50,9 +50,9 @@ function State:__init ()
 end
 
 function State.setRefs (parent)
-    push = parent
-    modes = parent.modes
-    midi = parent.midi
+    _push = parent
+    _mode = parent._mode
+    _midi = parent._midi
 end
 
 function State:getState ()
@@ -85,8 +85,8 @@ function State:getInstrumentCount ()
     if self.instrumentCount ~= instrumentCt then self.instrumentCount = instrumentCt end
 end
 
-function State:loadMode (cc)
-    local page, mode = 1, modes:select(cc)
+function State:getMode (cc)
+    local page, mode = 1, _mode:select(cc)
     if mode then
         if mode.name == self.activeMode.name then
             if self.activePage == #mode.page then page = 1 else
@@ -109,9 +109,9 @@ function State:loadMode (cc)
 end
 
 function State:changeMode (data)
-    if modes.modes[data[2]] and data[3] > 1 then
-        if not self:loadMode(data[2]) then return false end
-        self:loadMode(data[2])
+    if _mode.modes[data[2]] and data[3] > 1 then
+        if not self:getMode(data[2]) then return false end
+        self:getMode(data[2])
         self:setPatternDisplay {0,0,1}
         self.dirty = true
         return true
@@ -168,7 +168,7 @@ function State:setEditPos (data)
     if pos == nil then return false end
     local shift_mult = (self.shiftActive and 10) or 1
     if data[2] == 15 then
-        local encoderVal = midi.encoderParse(data, 7)
+        local encoderVal = _midi.encoderParse(data, 7)
         if encoderVal == 0 then return nil end
         pos.line = pos.line + encoderVal * shift_mult
     elseif (data[2] == 46 or data[2] == 47) and data[3] > 0 then
@@ -301,7 +301,7 @@ end
 function State:setMasterVolume (data)
     local shift_mult = (self.shiftActive and 0.1) or 1
     local masterTrack = song.tracks[song.sequencer_track_count + 1]
-    local val = masterTrack.postfx_volume.value + ((midi.encoderParse(data, 5) * 0.2) * shift_mult)
+    local val = masterTrack.postfx_volume.value + ((_midi.encoderParse(data, 5) * 0.2) * shift_mult)
     if val < masterTrack.postfx_volume.value_min then val = masterTrack.postfx_volume.value_min
     elseif val > masterTrack.postfx_volume.value_max then val = masterTrack.postfx_volume.value_max end
     masterTrack.postfx_volume.value = val
@@ -383,7 +383,7 @@ function State:changeSequence (data)
     -- if song.transport.follow_player then
     --     pos = song.transport.playback_pos
     -- end    local pos = (song.transport.follow_player and song.transport.playback_pos) or nil
-    local direction = midi.encoderParse(data, nil)
+    local direction = _midi.encoderParse(data, nil)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activeSeqIndex == song.transport.song_length.sequence then return end
@@ -414,7 +414,7 @@ end
 
 function State:changePattern (data)
     if data[3] == 0 then return end
-    local direction = midi.encoderParse(data, nil)
+    local direction = _midi.encoderParse(data, nil)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activePattern == 999 then return end
@@ -427,7 +427,7 @@ end
 
 function State:changePatternLength (data)
     if data[3] == 0 then return end
-    local direction = midi.encoderParse(data, 3)
+    local direction = _midi.encoderParse(data, 3)
     if direction == 0 then return end
     local lines = song.patterns[self.activePattern].number_of_lines
     local shift_mult = (self.shiftActive and 4) or 1
@@ -455,7 +455,7 @@ function State:changeTrack (data)
     else
         local direction
         -- if data[2] == 71 then
-        --     direction = midi.encoderParse(data, 8)
+        --     direction = _midi.encoderParse(data, 8)
         -- else
         direction = (data[2] == 45 and 1) or -1
         -- end
@@ -477,7 +477,7 @@ end
 
 function State:changeInstrument (data)
     if data[3] == 0 then return end
-    local direction = midi.encoderParse(data, 8)
+    local direction = _midi.encoderParse(data, 8)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activeInstrument == renoise.Song.MAX_NUMBER_OF_INSTRUMENTS

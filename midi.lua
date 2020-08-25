@@ -1,4 +1,4 @@
-local push, state, modes
+local _push, _state, _mode
 
 class "Midi"
 -- library of static functions and tables for MIDI communication and formatting
@@ -60,9 +60,9 @@ Midi.sysex = {
 }
 
 function Midi.setRefs (parent)
-    push = parent
-    state = parent.state
-    modes = parent.modes
+    _push = parent
+    _state = parent._state
+    _mode = parent._mode
 end
 
 function Midi.handleMidi (data)
@@ -73,35 +73,35 @@ function Midi.handleMidi (data)
     -- if not control then return end
     -- rprint(control)
     if control and control.hasCC then
-        if control.name == "shift" then state:shift(data) return end
-        if control.name == "play" then state:play(data) return end
-        if control.name == "record" then state:edit(data) return end
-        if state:changeMode(data) then return end
+        if control.name == "shift" then _state:shift(data) return end
+        if control.name == "play" then _state:play(data) return end
+        if control.name == "record" then _state:edit(data) return end
+        if _state:changeMode(data) then return end
     end
-    state.activeMode.action(data)
+    _state.activeMode.action(data)
 end
 
 function Midi.sendMidi (data)
-    if push.output.is_open then
-        push.output:send(data)
+    if _push.output.is_open then
+        _push.output:send(data)
     end
 end
 
 function Midi.encoderParse (data, thinningLevel)
     if data[3] == 0 then return 0 end
-    if #push.encoderStream ~= 0 and push.encoderStream[#push.encoderStream].cc ~= data[2] then
-        push.encoderStream = {}
+    if #_push.encoderStream ~= 0 and _push.encoderStream[#_push.encoderStream].cc ~= data[2] then
+        _push.encoderStream = {}
     end
     if thinningLevel then
-        table.insert(push.encoderStream, {cc = data[2], value = data[3]})
-        if #push.encoderStream == 1 then
-            if push.encoderStream[1].value < 64 then
-                return push.encoderStream[1].value
+        table.insert(_push.encoderStream, {cc = data[2], value = data[3]})
+        if #_push.encoderStream == 1 then
+            if _push.encoderStream[1].value < 64 then
+                return _push.encoderStream[1].value
             else
-                return -1 * (128 - push.encoderStream[1].value)
+                return -1 * (128 - _push.encoderStream[1].value)
             end
-        elseif #push.encoderStream == thinningLevel then
-            push.encoderStream = {}
+        elseif #_push.encoderStream == thinningLevel then
+            _push.encoderStream = {}
         end
         return 0
     else
@@ -155,7 +155,7 @@ function Midi:writeText (data, ...)
         if n_args > 0 then
             local t = {...}
             local line = t[1]
-            state.displaySysexByLine[line] = data
+            _state.displaySysexByLine[line] = data
         end
     end
 end
