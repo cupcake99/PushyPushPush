@@ -1,3 +1,4 @@
+local push, modes, midi
 local note_table = {
     ["C"] = 0,
     ["D"] = 1,
@@ -21,7 +22,7 @@ class "State"
 -- representation of the state of the Renoise song and methods to change parameters within it
 
 function State:__init ()
-    self.activeMode = nil
+    self.activeMode = {name = ""}
     self.activePage = 0
     self.activeSeqIndex = nil
     self.activePattern = nil
@@ -46,6 +47,12 @@ function State:__init ()
     self.dirty = false
     self.noteOns = {}
     self.noteDelta = nil
+end
+
+function State.setRefs (parent)
+    push = parent
+    modes = parent.modes
+    midi = parent.midi
 end
 
 function State:getState ()
@@ -159,7 +166,7 @@ function State:setEditPos (data)
     if pos == nil then return false end
     local shift_mult = (self.shiftActive and 10) or 1
     if data[2] == 15 then
-        local encoderVal = midi:encoderParse(data, 7)
+        local encoderVal = midi.encoderParse(data, 7)
         if encoderVal == 0 then return nil end
         pos.line = pos.line + encoderVal * shift_mult
     elseif (data[2] == 46 or data[2] == 47) and data[3] > 0 then
@@ -215,11 +222,10 @@ function State:setPatternDisplay (data)
     if data[3] == 0 then return end
     if self.activePattern == nil then return end
     if self.editPos > song.patterns[self.activePattern].number_of_lines then
-        print("[PushyPushPush] ERROR: Invalid Line Index for setPatternDisplay")
+        print "[PushyPushPush] ERROR: Invalid Line Index for setPatternDisplay"
         return
     end
-    local note
-    local line
+    local note, line
     local patt = self.activePattern
     local trk = self.activeTrack
     for i = 36, 99 do
@@ -293,7 +299,7 @@ end
 function State:setMasterVolume (data)
     local shift_mult = (self.shiftActive and 0.1) or 1
     local masterTrack = song.tracks[song.sequencer_track_count + 1]
-    local val = masterTrack.postfx_volume.value + ((midi:encoderParse(data, 5) * 0.2) * shift_mult)
+    local val = masterTrack.postfx_volume.value + ((midi.encoderParse(data, 5) * 0.2) * shift_mult)
     if val < masterTrack.postfx_volume.value_min then val = masterTrack.postfx_volume.value_min
     elseif val > masterTrack.postfx_volume.value_max then val = masterTrack.postfx_volume.value_max end
     masterTrack.postfx_volume.value = val
@@ -375,7 +381,7 @@ function State:changeSequence (data)
     -- if song.transport.follow_player then
     --     pos = song.transport.playback_pos
     -- end    local pos = (song.transport.follow_player and song.transport.playback_pos) or nil
-    local direction = midi:encoderParse(data, nil)
+    local direction = midi.encoderParse(data, nil)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activeSeqIndex == song.transport.song_length.sequence then return end
@@ -406,7 +412,7 @@ end
 
 function State:changePattern (data)
     if data[3] == 0 then return end
-    local direction = midi:encoderParse(data, nil)
+    local direction = midi.encoderParse(data, nil)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activePattern == 999 then return end
@@ -419,7 +425,7 @@ end
 
 function State:changePatternLength (data)
     if data[3] == 0 then return end
-    local direction = midi:encoderParse(data, 3)
+    local direction = midi.encoderParse(data, 3)
     if direction == 0 then return end
     local lines = song.patterns[self.activePattern].number_of_lines
     local shift_mult = (self.shiftActive and 4) or 1
@@ -447,7 +453,7 @@ function State:changeTrack (data)
     else
         local direction
         -- if data[2] == 71 then
-        --     direction = midi:encoderParse(data, 8)
+        --     direction = midi.encoderParse(data, 8)
         -- else
         direction = (data[2] == 45 and 1) or -1
         -- end
@@ -469,7 +475,7 @@ end
 
 function State:changeInstrument (data)
     if data[3] == 0 then return end
-    local direction = midi:encoderParse(data, 8)
+    local direction = midi.encoderParse(data, 8)
     if direction == 0 then return end
     if direction >= 1 then
         if self.activeInstrument == renoise.Song.MAX_NUMBER_OF_INSTRUMENTS
@@ -484,10 +490,7 @@ end
 function State:setSharp (data) --need to set light correctly when adding or deleting notes
     if data[3] == 0 then return end
     if not song.transport.edit_mode then return false end
-    local note
-    local line
-    local sharp
-    local no_funny_business
+    local note, line, sharp, no_funny_business
     local patrn = song.patterns[self.activePattern]
     local trk = self.activeTrack
     if data[3] > 0 and self.current[data[2]].value == 0 then
@@ -547,10 +550,7 @@ function State:insertNote (data)
     if not song.transport.edit_mode then return false end
     if song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_MASTER
     or song.tracks[self.activeTrack].type == renoise.Track.TRACK_TYPE_SEND then return false end
-    local note
-    local line
-    local no_funny_business
-    local str
+    local note, line, no_funny_business, str
     local sharp = "-"
     local patrn = song.patterns[self.activePattern]
     local trk = self.activeTrack

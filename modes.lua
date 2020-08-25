@@ -1,3 +1,4 @@
+local push, state, midi
 local sequencer = {
     name = "sequencer",
     cc = getControlFromType("name", "note").cc,
@@ -139,6 +140,12 @@ class "Modes"
 function Modes:__init ()
     self.modes = {}
     self:registerMode(sequencer)
+end
+
+function Modes.setRefs (parent)
+    push = parent
+    state = parent.state
+    midi = parent.midi
 end
 
 function Modes:registerMode (modespec)

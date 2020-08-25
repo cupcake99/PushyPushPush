@@ -1,3 +1,5 @@
+local push, state, modes
+
 class "Midi"
 -- library of static functions and tables for MIDI communication and formatting
 
@@ -56,6 +58,12 @@ Midi.sysex = {
 
     user_mode = { 240, 71, 127, 21, 98, 0, 1, 1, 247 }
 }
+
+function Midi.setRefs (parent)
+    push = parent
+    state = parent.state
+    modes = parent.modes
+end
 
 function Midi.handleMidi (data)
     assert(#data == 3)
