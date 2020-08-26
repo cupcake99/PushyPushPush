@@ -265,7 +265,13 @@ Push.control = {
 
 local device_by_platform = { WINDOWS = "MIDIIN2%s*%(Ableton%s*Push%)%s*%d*", MACINTOSH = "Ableton Push %(User Port%)", LINUX = "Ableton Push%s*%d*:1" }
 
-local sysex_id_pattern = ""
+local sysex_id_pattern = {
+    "240", "126", "%d+",  "6",  "2",  "71", "21", "0",
+    "25",  "0",   "1",  "1",  "6",  "0",  "0",  "0",
+    "0",   "0",   "56", "54", "56", "54", "51", "45",
+    "49",  "53",  "50", "51", "54", "48", "55", "49",
+    "0",   "0",   "247"
+}
 
 function Push:setRefs ()
     self._state.setRefs(self)
@@ -275,10 +281,10 @@ end
 
 function Push:findDeviceByName()
     local name
-    for i, device in ipairs(renoise.Midi.available_output_devices()) do
-        name = string.match(device, device_by_platform[os.platform()])
+    for _, device in ipairs(renoise.Midi.available_output_devices()) do
+        name = string.find(device, device_by_platform[os.platform()])
         if name then
-            self.device_name = renoise.Midi.available_output_devices()[i]
+            self.device_name = device
             return true
         end
     end
@@ -288,28 +294,40 @@ function Push:findDeviceByName()
 end
 
 function Push:findDeviceBySysex()
-    local name
-    for i, device in ipairs(renoise.Midi.available_output_devices()) do
-        name = string.match(device, device_by_platform[os.platform()])
-        if name then
-            self.device_name = renoise.Midi.available_output_devices()[i]
-            return true
-        end
+    local t_input, t_output, id = {}
+    for i, device in ipairs(renoise.Midi.available_input_devices()) do
+        t_input[i] = renoise.Midi.create_input_device(device, nil,
+            function (reply)
+                if id then t_input[i]:close() return end -- exit if Push has already been found
+                for index, byte in ipairs(reply) do
+                    if not string.find(tostring(byte), sysex_id_pattern[index]) then
+                        t_input[i]:close()
+                        return -- exit if we hit a non-match
+                    end
+                end
+                id = renoise.Midi.available_input_devices()[i+1]
+                print("[PushyPushPush]: Found device", id)
+                t_input[i]:close()
+            end
+        )
     end
---unable to find a Push
-    self.device_name = nil
-    return false
+    for _, device in ipairs(renoise.Midi.available_output_devices()) do
+        t_output = renoise.Midi.create_output_device(device)
+        t_output:send(Midi.sysex.id_request)
+        t_output:close()
+    end
+    if id then self.device_name = id return true else return false end
 end
 
 function Push:watchMidiDevices()
-    if not Push:findDeviceByName() then
+    if not self:findDeviceByName() then
         self:stop()
         self:start()
     end
 end
 
 function Push:open ()
-    if Push:findDeviceByName() then
+    if self:findDeviceBySysex() then
         if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
             return false
         end

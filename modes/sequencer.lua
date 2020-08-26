@@ -65,18 +65,18 @@ local sequencer = {
             action = function (data)
                 local control, index
                 if data[1] == Midi.status.note_on then
-                    control, index = getControlFromType("note", data[2])
+                    control = getControlFromType("note", data[2])
                     if control.hasNote and control.note < 36 then
                         return
                     elseif control.hasNote and control.note > 35 and control.note < 100 then
                         if push._state:insertNote(data) then
-                            push._state:setPatternDisplay({0, 0, 1})
+                            push._state:setPatternDisplay {0, 0, 1}
                         else
                             push._state:receiveNote(data)
                         end
                     end
                 elseif data[1] == Midi.status.note_off then
-                    control, index = getControlFromType("note", data[2])
+                    control = getControlFromType("note", data[2])
                     if control.hasNote and control.note < 36 then
                         return
                     elseif control.hasNote and control.note > 35 and control.note < 100 then
@@ -96,7 +96,7 @@ local sequencer = {
                         else
                             push._state:changePattern(data)
                         end
-                        push._state:setPatternDisplay({0, 0, 1})
+                        push._state:setPatternDisplay {0, 0, 1}
                     elseif control.name == "swing" and control.hasCC then
                         if push._state:setEditPos(data) then
                             push._state:setPatternDisplay(data)
@@ -127,7 +127,7 @@ local sequencer = {
                         control.name == "softkey7A" or
                         control.name == "softkey8A" then
                             push._state:changeTrack(data)
-                            push._state:setPatternDisplay({0, 0, 1})
+                            push._state:setPatternDisplay {0, 0, 1}
                     elseif control.name == "dial2" then
                         push._state:changeInstrument(data)
                     elseif control.name == "dial3" then

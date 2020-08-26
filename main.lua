@@ -1,4 +1,3 @@
--- _AUTO_RELOAD_DEBUG = true
 
 tool = renoise.tool()
 song = nil
@@ -25,5 +24,9 @@ end
 
 tool.app_new_document_observable:add_notifier(letsGo)
 tool.app_release_document_observable:add_notifier(goodnight)
---push:stop()
+
+function disable ()
+    if push then goodnight() else letsGo() end
+end
+tool:add_keybinding { name = "Global:tool:disable_PPP",  invoke = disable }
 
