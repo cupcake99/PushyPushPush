@@ -334,19 +334,19 @@ function Push:open ()
 
         if self.output and self.output.is_open then
             self.output:close()
-            print("closing output")
+            print "[PushyPushPush]: Output already open. Closing output"
         end
 
         self.output = renoise.Midi.create_output_device(self.device_name)
-        print("opening output", self.output.name)
+        print("[PushyPushPush]: Opening output", self.output.name)
 
         if self.input and self.input.is_open then
             self.input:close()
-            print("closing input")
+            print "[PushyPushPush]: Input already open. Closing input"
         end
 
         self.input = renoise.Midi.create_input_device(self.device_name, Midi.handleMidi)
-        print("opening input", self.input.name)
+        print("[PushyPushPush]: Opening input", self.input.name)
 
         self._midi.sendMidi(Midi.sysex.user_mode)
 
@@ -358,11 +358,11 @@ end
 function Push:close ()
     if self.output and self.output.is_open then
         self.output:close()
-        print("closing output")
+        print "[PushyPushPush]: Closing output"
     end
     if self.input and self.input.is_open then
         self.input:close()
-        print("closing input")
+        print "[PushyPushPush]: Closing input"
     end
 end
 
@@ -417,6 +417,8 @@ function Push:stop ()
     -- end
 
     self:close()
+
+    print "[PushyPushPush]: Has left the building..."
 
     self.output = nil
     self.input = nil

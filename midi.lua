@@ -124,7 +124,7 @@ function Midi.formatLine (format, text, ...)
         line = select(1, ...)
         zone = select(2, ...)
     else
-        print("missing or extra arguments to formatLine (format, text, line[, zone])")
+        print "[PushyPushPush]: Missing or extra arguments to formatLine (format, text, line[, zone])"
         return nil
     end
     if s then s[5] = Midi.sysex.line_number.write[line] else return nil end

@@ -22,6 +22,6 @@ function getControlFromType (want, data)
 end
 
 function printSelf (object)
-    print(string.format("[%s] self:", type(object)), object)
+    print(string.format("[PushyPushPush]: [%s] self:", type(object)), object)
 end
 
