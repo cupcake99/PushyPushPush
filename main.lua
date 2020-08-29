@@ -1,3 +1,4 @@
+local _DEBUG = true
 
 tool = renoise.tool()
 song = nil
@@ -16,7 +17,7 @@ local function letsGo ()
 end
 
 local function goodnight ()
-    push:stop()
+    if push then push:stop() end
     tool = nil
     song = nil
     push = nil
@@ -25,8 +26,10 @@ end
 tool.app_new_document_observable:add_notifier(letsGo)
 tool.app_release_document_observable:add_notifier(goodnight)
 
-function disable ()
-    if push then goodnight() else letsGo() end
+if _DEBUG then
+    function disable ()
+        if push then goodnight() else letsGo() end
+    end
+    tool:add_keybinding { name = "Global:tool:disable_PPP",  invoke = disable }
 end
-tool:add_keybinding { name = "Global:tool:disable_PPP",  invoke = disable }
 

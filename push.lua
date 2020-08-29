@@ -273,6 +273,7 @@ local sysex_id_pattern = {
     "0",   "0",   "247"
 }
 
+
 function Push:setRefs ()
     self._state.setRefs(self)
     self._mode.setRefs(self)
@@ -282,7 +283,7 @@ end
 function Push:findDeviceByName()
     local name
     for _, device in ipairs(renoise.Midi.available_output_devices()) do
-        name = string.find(device, device_by_platform[os.platform()])
+        name = string.find(string.lower(device), device_by_platform[os.platform()])
         if name then
             self.device_name = device
             return true
@@ -305,7 +306,8 @@ function Push:findDeviceBySysex()
                         return -- exit if we hit a non-match
                     end
                 end
-                id = renoise.Midi.available_input_devices()[i+1]
+                id = renoise.Midi.available_input_devices()[i+1] -- this is a kludge to get the User port. There is no guarantee that the Live port will be registered and discovered first, it is only assumed to be the case.
+                if not string.find(string.lower(id), "ableton") then id = nil; t_input[i]:close() return end -- check to see we aren't getting wrong device
                 print("[PushyPushPush]: Found device", id)
                 t_input[i]:close()
             end
@@ -393,11 +395,12 @@ function Push:start ()
     song.selected_pattern_index_observable:add_notifier(self._state, State.setActivePattern)
     song.selected_track_index_observable:add_notifier(self._state, State.setActiveTrack)
     song.selected_instrument_index_observable:add_notifier(self._state, State.setActiveInstrument)
+    song.transport.octave_observable:add_notifier(self._state, State.setOctave)
     printSelf(self)
     printSelf(self._midi)
     printSelf(self._mode)
     printSelf(self._state)
-
+    self._state.dirty = true
 end
 
 function Push:stop ()
@@ -450,14 +453,22 @@ function Push:stop ()
     if song.selected_instrument_index_observable:has_notifier(self._state, State.setActiveInstrument) then
         song.selected_instrument_index_observable:remove_notifier(self._state, State.setActiveInstrument)
     end
+    if song.transport.octave_observable:has_notifier(self._state, State.setOctave) then
+        song.transport.octave_observable:remove_notifier(self._state, State.setOctave)
+    end
 end
 
 function Push:update ()
     if self._state.dirty then
         local data, dummy, index
         local string = table.copy(Midi.sysex.write_line)
+        -- print "outside for"
+        -- rprint(self._state.current)
         for i = 1, 120 do
+            -- print("inside for, i=%d", i)
+            -- rprint(self._state.current[i])
             if self._state.current[i] and self._state.current[i].hasCC and self._state.current[i].hasLED then
+                -- print("inside if", i, self._state.current[i].name, self._state.current[i].value)
                 data = {Midi.status.cc, self._state.current[i].cc, self._state.current[i].value}
                 self._midi.sendMidi(data)
             end
