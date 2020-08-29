@@ -89,7 +89,7 @@ local sequencer = {
                 elseif data[1] == Midi.status.cc then
                     control, index = getControlFromType("cc", data[2])
                     if control.hasCC and control.cc > 35 and control.cc < 44 then
-                        push._state:setSharp(data)
+                        -- push._state:setSharp(data)
                     elseif control.name == "tempo" and control.hasCC then
                         if push._state.shiftActive then
                             push._state:changeSequence(data)
@@ -130,6 +130,8 @@ local sequencer = {
                             push._state:setPatternDisplay {0, 0, 1}
                     elseif control.name == "dial2" then
                         push._state:changeInstrument(data)
+                    elseif control.name == "oct_up" or control.name == "oct_down" then
+                        push._state:changeOctave(data)
                     elseif control.name == "dial3" then
                         push._state:changePatternLength(data)
                     else return end
