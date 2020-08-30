@@ -12,8 +12,54 @@ function Push:__init ()
     self.encoderStream = {}
 end
 
+local function setProxy (_t)
+    local read_only = {
+        papa_table = {},
+        key = 0
+    }
+    for access, _ in pairs(_t) do
+        local temp = {}
+        read_only[access] = setmetatable(temp, {
+            __index = _t[access],
+            __newindex = function (t, k, v)
+                print("inside read_only", t, k, v)
+                print("temp:", temp)
+                print("papa:", read_only.papa_table)
+                print("papa key:", read_only.key)
+                assert(t ~= temp) -- check write is to a different table than the proxy
+                rawset(t, k, v)
+            end,
+            __call = function ()
+                local keys = table.keys(_t[access])
+                local i = 0
+                return function()
+                    i = i + 1
+                    return keys[i], _t[access][keys[i]]
+                end
+            end
+            }
+        )
+        -- print(read_only[access])
+    end
+    local gump = {}
+    local proxy = setmetatable(gump, {
+            __index = function (t, k)
+                print("gump", gump)
+                print("here proxy", t, k)
+                read_only.papa_table = t
+                read_only.key = k
+                return read_only
+            end,
+            __newindex = function (t, k, v)
+                print("inside proxy", t, k, v)
+            end
+            }
+        )
+    return proxy
+end
+
 -- CC value for the various lighting modes of the button LEDs. Blink value can be added to a button or note_val light to make it blink. Pad light can be set to various animated modes by changing the channel of the note sent to Push.
-Push.light = {
+local _light = {
     button = {
         low = 1,
         high = 4,
@@ -119,7 +165,9 @@ Push.light = {
     }
 }
 
-Push.control = {
+Push.light = setProxy(_light)
+
+local _control = {
     [71]  = { name="dial1",        cc=71,  note=0,   value=nil,                   hasCC=true,  hasNote=true,  hasLED=false },
     [72]  = { name="dial2",        cc=72,  note=1,   value=nil,                   hasCC=true,  hasNote=true,  hasLED=false },
     [73]  = { name="dial3",        cc=73,  note=2,   value=nil,                   hasCC=true,  hasNote=true,  hasLED=false },
@@ -263,7 +311,9 @@ Push.control = {
     [140] = { name="bender",       cc=0,   note=12,  value=nil,                   hasCC=false, hasNote=true,  hasLED=false }
 }
 
-local device_by_platform = { WINDOWS = "MIDIIN2%s*%(Ableton%s*Push%)%s*%d*", MACINTOSH = "Ableton Push %(User Port%)", LINUX = "Ableton Push%s*%d*:1" }
+Push.control = setProxy(_control)
+
+local device_by_platform = { WINDOWS = "midiin2%s*%(ableton%s*push%)%s*%d*", MACINTOSH = "ableton%s*push%s*%(user%s*port%)", LINUX = "ableton%s*push%s*%d*:1" }
 
 local sysex_id_pattern = {
     "240", "126", "%d+",  "6",  "2",  "71", "21", "0",

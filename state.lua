@@ -42,8 +42,8 @@ function State:__init ()
         }
     }
     self.displaySysexByLine = {}
-    self.current = setmetatable({}, {__index = Push.control})
-    self.last = table.copy(self.current)
+    self.current = table.copy(Push.control)
+    -- self.last = table.copy(self.current)
     self.shiftActive = false
     self.dirty = false
     self.noteOns = {}
@@ -113,7 +113,7 @@ end
 function State:changeMode (data)
     if _mode.modes[data[2]] and data[3] > 1 then
         if not self:getMode(data[2]) then return false end
-        self:getMode(data[2])
+        rprint(self.current)
         self:setPatternDisplay {0,0,1}
         self.dirty = true
         return true
@@ -212,12 +212,18 @@ function State:setEditPos (data)
         song.transport.edit_pos = pos
     -- end
     if self.editPos == 1 then -- fix checking when song.transport.wrapped_pattern_edit is true else lights weird on crossing sequence boundaries
-        self.current[46].value = Push.light.button.off
+        print("before", Push.control[46].value)
+        self.current[46].value = Push.light.button.off -- somehow this is writing to the PUsh table
+        print("after", Push.control[46].value)
     elseif self.editPos == song.patterns[self.activePattern].number_of_lines then
         self.current[47].value = Push.light.button.off
     else
-        self.current[46].value = Push.light.button.low
-        self.current[47].value = Push.light.button.low
+        print "in else"
+        self.current[46] = nil
+        print(self.current[46].value)
+        print(Push.control[46].value)
+        self.current[47] = nil
+        print(self.current[47].value)
     end
     return true
 end

@@ -28,21 +28,28 @@ function Mode.setRefs (parent)
 end
 
 function Mode:registerMode (modespec)
+    print "in registermode"
     local cc = getControlFromType("name", modespec.control).cc
     self.modes[cc] = {name = modespec.name}
     for page, spec in ipairs(modespec.page) do
-        local temp = setmetatable({}, {__index = Push.control})
+        local temp = {}
         for name, value in pairs(spec.lights()) do
             local control = getControlFromType("name", name)
             if control then
-                temp[control.cc] = control
+                print "in loop"
+                temp[control.cc] = {}
+                for key, val in control() do
+                    temp[control.cc][key] = val
+                end
+                print("og", control)
+                print("temp__", temp[control.cc])
                 temp[control.cc].value = value
             end
         end
         self.modes[cc] = {
             page = {
                 [page] = {
-                    temp,
+                    lights = temp,
                     display = modespec.page[page].display,
                     action = modespec.page[page].action
                 }
