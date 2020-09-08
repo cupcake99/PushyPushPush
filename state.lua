@@ -95,9 +95,9 @@ function State:getMode (cc)
                 self.current[i] = table.copy(mode.page[page].lights[i])
             end
         end
-        self.current.display = mode.page[page].display()
         self.activeMode = {name = mode.name, action = mode.page[page].action()}
         self.activePage = page
+        self.current.display = mode.page[page].display()
         return true
     end
     return false
@@ -106,7 +106,6 @@ end
 function State:changeMode (data)
     if _mode.modes[data[2]] and data[3] > 1 then
         if not self:getMode(data[2]) then return false end
-        self:getMode(data[2])
         self:setPatternDisplay {0,0,1}
         self.dirty = true
         return true

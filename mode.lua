@@ -29,7 +29,10 @@ end
 
 function Mode:registerMode (modespec)
     local cc = getControlFromType("name", modespec.control).cc
-    self.modes[cc] = {name = modespec.name}
+    self.modes[cc] = {
+        name = modespec.name,
+        page = {}
+    }
     for page, spec in ipairs(modespec.page) do
         local lights = {}
         for name, value in pairs(spec.lights()) do
@@ -39,14 +42,10 @@ function Mode:registerMode (modespec)
                 lights[control.cc].value = value
             end
         end
-        self.modes[cc] = {
-            page = {
-                [page] = {
+        self.modes[cc].page[page] = {
                     lights = lights,
                     display = modespec.page[page].display,
                     action = modespec.page[page].action
-                }
-            }
         }
     end
 end
