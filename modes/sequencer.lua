@@ -48,7 +48,7 @@ local sequencer = {
             -- Eventual intention is for the mode spec to be simple key-value pair style statements which are compiled into
             -- a callable function similar to the one below, but without necessity to write lots of conditionals etc.
             display = function ()
-                local display = push._state.display
+                local display = table.copy(Push.display)
                 local z = 1
                 for i = push._state.trackRange.from, push._state.trackRange.to do
                     if i == push._state.activeTrack then
@@ -61,82 +61,57 @@ local sequencer = {
                 display.line[2].zone[2] = (song.selected_instrument.name == "" and "un-named") or song.selected_instrument.name
                 display.line[2].zone[3] = " Length:"
                 display.line[3].zone[3] = "   " .. song.patterns[push._state.activePattern].number_of_lines
+
+                return display
             end,
-            action = function (data)
-                local control, index
-                if data[1] == Midi.status.note_on then
-                    control = getControlFromType("note", data[2])
-                    if control.hasNote and control.note < 36 then
-                        return
-                    elseif control.hasNote and control.note > 35 and control.note < 100 then
-                        if push._state:insertNote(data) then
-                            push._state:setPatternDisplay {0, 0, 1}
-                        else
-                            push._state:receiveNote(data)
-                        end
+            action = function ()
+                local action = {}
+                action.tempo = assert(loadstring([[
+                    local data = select(2, ...)
+                    if push._state.shiftActive then
+                        push._state:changeSequence(data)
+                    else
+                        push._state:changePattern(data)
                     end
-                elseif data[1] == Midi.status.note_off then
-                    control = getControlFromType("note", data[2])
-                    if control.hasNote and control.note < 36 then
-                        return
-                    elseif control.hasNote and control.note > 35 and control.note < 100 then
-                        if song.transport.edit_mode then
-                            return
-                        else
-                            push._state:receiveNote(data)
-                        end
-                    end
-                elseif data[1] == Midi.status.cc then
-                    control, index = getControlFromType("cc", data[2])
-                    if control.hasCC and control.cc > 35 and control.cc < 44 then
-                        -- push._state:setSharp(data)
-                    elseif control.name == "tempo" and control.hasCC then
-                        if push._state.shiftActive then
-                            push._state:changeSequence(data)
-                        else
-                            push._state:changePattern(data)
-                        end
-                        push._state:setPatternDisplay {0, 0, 1}
-                    elseif control.name == "swing" and control.hasCC then
-                        if push._state:setEditPos(data) then
-                            push._state:setPatternDisplay(data)
-                        end
-                    elseif control.name == "volume" then
-                        push._state:setMasterVolume(data)
-                    elseif control.name == "mute" then
-                        local muted = song.tracks[push._state.activeTrack].mute_state ~= 1
-                        if data[3] > 0 then
-                            if muted then song.tracks[push._state.activeTrack]:unmute()
-                            else song.tracks[push._state.activeTrack]:mute() end
-                            push._state.current[index].value =
-                            ((song.tracks[push._state.activeTrack].mute_state ~= 1)
-                            and Push.light.button.high + Push.light.blink.slow) or Push.light.button.low
-                        end
-                    elseif control.name == "csr_up" or control.name == "csr_down" then
-                        if push._state:setEditPos(data) then
-                            push._state:setPatternDisplay(data)
-                        end
-                    elseif control.name == "csr_left" or
-                        control.name == "csr_right" or--[[or control.name == "dial1"]]
-                        control.name == "softkey1A" or
-                        control.name == "softkey2A" or
-                        control.name == "softkey3A" or
-                        control.name == "softkey4A" or
-                        control.name == "softkey5A" or
-                        control.name == "softkey6A" or
-                        control.name == "softkey7A" or
-                        control.name == "softkey8A" then
-                            push._state:changeTrack(data)
-                            push._state:setPatternDisplay {0, 0, 1}
-                    elseif control.name == "dial2" then
-                        push._state:changeInstrument(data)
-                    elseif control.name == "oct_up" or control.name == "oct_down" then
-                        push._state:changeOctave(data)
-                    elseif control.name == "dial3" then
-                        push._state:changePatternLength(data)
-                    else return end
-                end
-                push._state.dirty = true
+                    push._state:setPatternDisplay {0, 0, 1}]]))
+                action.swing = assert(loadstring([[
+                    local data = select(2, ...)
+                    if push._state:setEditPos(data) then
+                        push._state:setPatternDisplay(data)
+                    end]]))
+                action.volume = push._state.setMasterVolume
+                action.mute = assert(loadstring([[
+                    local data = select(2, ...)
+                    local index = select(3, ...)
+                    local muted = song.tracks[push._state.activeTrack].mute_state ~= 1
+                    if data[3] > 0 then
+                        if muted then song.tracks[push._state.activeTrack]:unmute()
+                        else song.tracks[push._state.activeTrack]:mute() end
+                        push._state.current[index].value =
+                        ((song.tracks[push._state.activeTrack].mute_state ~= 1)
+                        and Push.light.button.high + Push.light.blink.slow) or Push.light.button.low
+                    end]]))
+                action.csr_up = action.swing
+                action.csr_down = action.swing
+                action.csr_left = assert(loadstring([[
+                    local data = select(2, ...)
+                    push._state:changeTrack(data)
+                    push._state:setPatternDisplay {0, 0, 1}]]))
+                action.csr_right = action.csr_left
+                action.softkey1A = action.csr_left
+                action.softkey2A = action.csr_left
+                action.softkey3A = action.csr_left
+                action.softkey4A = action.csr_left
+                action.softkey5A = action.csr_left
+                action.softkey6A = action.csr_left
+                action.softkey7A = action.csr_left
+                action.softkey8A = action.csr_left
+                action.dial2 = push._state.changeInstrument
+                action.oct_up = push._state.changeOctave
+                action.oct_down = action.oct_up
+                action.dial3 = push._state.changePatternLength
+
+                return action
             end
         }
     }

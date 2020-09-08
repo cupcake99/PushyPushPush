@@ -31,18 +31,18 @@ function Mode:registerMode (modespec)
     local cc = getControlFromType("name", modespec.control).cc
     self.modes[cc] = {name = modespec.name}
     for page, spec in ipairs(modespec.page) do
-        local temp = setmetatable({}, {__index = Push.control})
+        local lights = {}
         for name, value in pairs(spec.lights()) do
             local control = getControlFromType("name", name)
             if control then
-                temp[control.cc] = control
-                temp[control.cc].value = value
+                lights[control.cc] = control
+                lights[control.cc].value = value
             end
         end
         self.modes[cc] = {
             page = {
                 [page] = {
-                    temp,
+                    lights = lights,
                     display = modespec.page[page].display,
                     action = modespec.page[page].action
                 }

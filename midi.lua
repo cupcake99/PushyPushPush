@@ -67,6 +67,39 @@ function Midi.setRefs (parent)
     _mode = parent._mode
 end
 
+function Midi.callAction(data)
+    local control, index
+    if data[1] == Midi.status.note_on then
+        control = getControlFromType("note", data[2])
+        if control.hasNote and control.note < 36 then
+            return
+        elseif control.hasNote and control.note > 35 and control.note < 100 then
+            if _state:insertNote(data) then
+                _state:setPatternDisplay {0, 0, 1}
+            else
+                _state:receiveNote(data)
+            end
+        end
+    elseif data[1] == Midi.status.note_off then
+        control = getControlFromType("note", data[2])
+        if control.hasNote and control.note < 36 then
+            return
+        elseif control.hasNote and control.note > 35 and control.note < 100 then
+            if song.transport.edit_mode then
+                return
+            else
+                _state:receiveNote(data)
+            end
+        end
+    elseif data[1] == Midi.status.cc then
+        control, index = getControlFromType("cc", data[2])
+        if _state.activeMode.action[control.name] then
+            _state.activeMode.action[control.name](_state, data, index)
+        end
+    end
+    _state.dirty = true
+end
+
 function Midi.handleMidi (data)
     assert(#data == 3)
     local control
@@ -80,7 +113,7 @@ function Midi.handleMidi (data)
         if control.name == "record" then _state:edit(data) return end
         if _state:changeMode(data) then return end
     end
-    _state.activeMode.action(data)
+    Midi.callAction(data)
 end
 
 function Midi.sendMidi (data)

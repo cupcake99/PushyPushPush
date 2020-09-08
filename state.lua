@@ -33,17 +33,10 @@ function State:__init ()
     self.activeInstrument = nil
     self.instrumentCount = 0
     self.octave = 0
-    self.display = {
-        line = {
-            {zone = {"", "", "", "", "", "", "", ""}},
-            {zone = {"", "", "", "", "", "", "", ""}},
-            {zone = {"", "", "", "", "", "", "", ""}},
-            {zone = {"", "", "", "", "", "", "", ""}}
-        }
-    }
     self.displaySysexByLine = {}
-    self.current = setmetatable({}, {__index = Push.control})
-    self.last = table.copy(self.current)
+    self.current = table.rcopy(Push.control)
+    -- self.last = table.rcopy(self.current)
+    self.current.display = table.rcopy(Push.display)
     self.shiftActive = false
     self.dirty = false
     self.noteOns = {}
@@ -96,14 +89,14 @@ function State:getMode (cc)
             end
             if not page then return end --see if page can change, if not mode and page is already loaded so exit
         end
+        self.current = table.rcopy(Push.control)
         for i = 1, 120 do
-            self.current[i] = nil
             if mode.page[page].lights[i] then
-                self.current[i] = mode.page[page].lights[i]
+                self.current[i] = table.copy(mode.page[page].lights[i])
             end
         end
-        mode.page[page].display()
-        self.activeMode = {name = mode.name, action = mode.page[page].action}
+        self.current.display = mode.page[page].display()
+        self.activeMode = {name = mode.name, action = mode.page[page].action()}
         self.activePage = page
         return true
     end
@@ -357,14 +350,14 @@ end
 function State:setActiveTrack ()
     if self.activeTrack ~= song.selected_track_index then
         self.activeTrack = song.selected_track_index
-        -- self.display.line[1].zone[1] = song.tracks[self.activeTrack].name
+        -- self.current.display.line[1].zone[1] = song.tracks[self.activeTrack].name
         local z = 1
         self:getTrackRange()
         for i = self.trackRange.from, self.trackRange.to do
             if i == self.activeTrack then
-                self.display.line[1].zone[z] = ">" .. song.tracks[i].name
+                self.current.display.line[1].zone[z] = ">" .. song.tracks[i].name
             else
-                self.display.line[1].zone[z] = song.tracks[i].name
+                self.current.display.line[1].zone[z] = song.tracks[i].name
             end
             z = z + 1
         end
@@ -376,7 +369,7 @@ end
 function State:setActiveInstrument ()
     if self.activeInstrument ~= song.selected_instrument_index then
         self.activeInstrument = song.selected_instrument_index
-        self.display.line[2].zone[2] = (
+        self.current.display.line[2].zone[2] = (
             song.selected_instrument.name == "" and "un-named"
             ) or song.selected_instrument.name
         self.dirty = true
@@ -394,8 +387,8 @@ function State:setOctave ()
             end
             self.current[cc].value = Push.light.button.off
         else
-            self.current[cc] = nil
-            self.current[cc + 1] = nil
+            self.current[cc].value = Push.light.button.high
+            self.current[cc + 1].value = Push.light.button.high
         end
     end
     self.dirty = true
@@ -467,8 +460,8 @@ function State:changePatternLength (data)
         if value < 1 then value = 1 end
         song.patterns[self.activePattern].number_of_lines = value
     end
-    self.display.line[2].zone[3] = " Length:"
-    self.display.line[3].zone[3] = "   " .. value
+    self.current.display.line[2].zone[3] = " Length:"
+    self.current.display.line[3].zone[3] = "   " .. value
 end
 
 function State:changeTrack (data)
