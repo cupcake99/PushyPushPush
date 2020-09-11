@@ -1,4 +1,5 @@
 local _DEBUG = true
+_OSC = false
 
 tool = renoise.tool()
 song = nil
@@ -13,7 +14,7 @@ local function letsGo ()
     require "mode"
     require "midi"
     if not push then push = Push() end
-    push:start()
+    push:start(1)
 end
 
 local function goodnight ()

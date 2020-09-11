@@ -1,5 +1,4 @@
 class "Push"
--- representation of the physical Push device, and methods to initialise the device and tool
 
 function Push:__init ()
     self._state = State()
@@ -480,8 +479,8 @@ function Push:watchMidiDevices()
     end
 end
 
-function Push:open ()
-    if self:findDeviceBySysex() then
+function Push:open (scan_func)
+    if scan_func(self) then
         if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
             return false
         end
@@ -520,22 +519,27 @@ function Push:close ()
     end
 end
 
-function Push:start ()
-    if not self:open() then
+function Push:start (manual)
+    local scan_func = Push.findDeviceBySysex
+    if not manual then scan_func = Push.findDeviceByName end -- if called by a notifier set correct scanner function
+    if not self:open(scan_func) then
         print "[PushyPushPush]: Cannot find Ableton Push device"
-        if tool:has_timer {self, Push.start} then
-            return
-        else
+        if not tool:has_timer {self, Push.start} then
             tool:add_timer({self, Push.start}, 5000)
         end
         return
     end
     if tool:has_timer {self, Push.start} then tool:remove_timer {self, Push.start} end
+
     self._midi:clearDisplay()
-    -- self._midi:initOSC()
-    -- if self._midi.server then
-    --     self._midi:runServer()
-    -- end
+
+    if _OSC then
+        self._midi:initOSC()
+        if self._midi.server then
+            self._midi:runServer()
+        end
+    end
+
     self._mode:loadModes()
     self._state:getState()
     self._state:changeMode {Midi.status.cc, getControlFromType("name", "note").cc, 127}
@@ -567,9 +571,11 @@ function Push:stop ()
         end
     end
 
-    -- if self._midi.server then
-    --     self._midi:closeServer()
-    -- end
+    if _OSC then
+        if self._midi.server then
+            self._midi:closeServer()
+        end
+    end
 
     self:close()
 
@@ -614,13 +620,8 @@ function Push:update ()
     if self._state.dirty then
         local data, dummy, index
         local string = table.copy(Midi.sysex.write_line)
-        -- print "outside for"
-        -- rprint(self._state.current)
         for i = 1, 120 do
-            -- print("inside for, i=%d", i)
-            -- rprint(self._state.current[i])
             if self._state.current[i] and self._state.current[i].hasCC and self._state.current[i].hasLED then
-                -- print("inside if", i, self._state.current[i].name, self._state.current[i].value)
                 data = {Midi.status.cc, self._state.current[i].cc, self._state.current[i].value}
                 self._midi.sendMidi(data)
             end

@@ -13,7 +13,7 @@ end
 
 function Mode:loadModes ()
     for _, name in ipairs(modenames) do
-        modes[name] = require("modes."..name)
+        modes[name] = require("modes." .. name)
     end
     for _, modespec in pairs(modes) do
         self:registerMode(modespec)

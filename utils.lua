@@ -20,11 +20,6 @@ function getControlFromType (want, data)
             index = Push.control_by_name[index]
             return table.copy(Push.control[index]), index
         end
-        -- for i = 1, 120 do
-            -- index = i + 128
-            -- if Push.control[i] ~= nil and Push.control[i].name == data then return Push.control[i], i
-            -- elseif Push.control[index] ~= nil and Push.control[index].name == data then return Push.control[index], index end
-        -- end
     end
     return nil
 end
