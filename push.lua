@@ -415,7 +415,7 @@ Push.display = {
         }
     }
 
-local device_by_platform = { WINDOWS = "MIDIIN2%s*%(Ableton%s*Push%)%s*%d*", MACINTOSH = "Ableton Push %(User Port%)", LINUX = "Ableton Push%s*%d*:1" }
+local device_by_platform = { WINDOWS = "midiin2%s*%(ableton%s*push%)%s*%d*", MACINTOSH = "ableton push %(user port%)", LINUX = "ableton push%s*%d*:1" }
 
 local sysex_id_pattern = {
     "240", "126", "%d+",  "6",  "2",  "71", "21", "0",

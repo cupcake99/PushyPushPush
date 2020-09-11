@@ -17,6 +17,7 @@ local note_table = {
     [6] = "B",
     [7] = "OFF",
 }
+local timer = 0
 
 class "State"
 -- representation of the state of the Renoise song and methods to change parameters within it
@@ -125,8 +126,7 @@ function State:shift (data)
 end
 
 function State:play (data)
-    if not Push.control[data[2]].name == "play" then return end
-    if data[3] == 0 then return end
+    if data[3] == 0 or not Push.control[data[2]].name == "play" then return end
     local playing = song.transport.playing and self.current[data[2]].value == Push.light.button.high
     if playing then
         song.transport:stop()
@@ -146,8 +146,7 @@ end
 
 
 function State:edit (data)
-    if not Push.control[data[2]].name == "record" then return end
-    if data[3] == 0 then return end
+    if data[3] == 0 or not Push.control[data[2]].name == "record" then return end
     local editing = song.transport.edit_mode and self.current[data[2]].value == Push.light.button.high
     if editing then
         song.transport.edit_mode = false
@@ -165,36 +164,31 @@ function State:setEditPos (data)
     local pos = song.transport.edit_pos
     if pos == nil then return false end
     local shift_mult = (self.shiftActive and 10) or 1
-    if data[2] == 15 then
+    local swing, csr_up, csr_down = 15, 46, 47
+    local pattn = song.patterns[self.activePattern]
+    if data[2] == swing then
         local encoderVal = _midi.encoderParse(data, 7)
         if encoderVal == 0 then return nil end
         pos.line = pos.line + encoderVal * shift_mult
-    elseif (data[2] == 46 or data[2] == 47) and data[3] > 0 then
-        pos.line = pos.line + (((data[2] - 46 == 1) and 1) or -1) * shift_mult
+    elseif (data[2] == csr_up or data[2] == csr_down) and data[3] > 0 then
+        pos.line = pos.line + (((data[2] - csr_up == 1) and 1) or -1) * shift_mult
     end
     -- print("Set Line: \n", "Sequence: ", pos.sequence, "\n", "Line: ", pos.line)
     if song.transport.wrapped_pattern_edit then
         if pos.line < 1 then
-            pos.line = (
-                pos.sequence == 1 and 1
-                ) or song.patterns[song.sequencer:pattern(pos.sequence - 1)].number_of_lines
-            pos.sequence = (
-                pos.sequence - 1 > 0 and pos.sequence - 1
-                ) or 1
-        elseif pos.line > song.patterns[self.activePattern].number_of_lines then
-            pos.line = (
-                pos.sequence == song.transport.song_length.sequence
-                and song.patterns[self.activePattern].number_of_lines
-                ) or 1
-            pos.sequence = (
-                pos.sequence + 1 < song.transport.song_length.sequence + 1 and pos.sequence + 1
-                ) or song.transport.song_length.sequence
+            pos.line = (pos.sequence == 1 and 1)
+            or song.patterns[song.sequencer:pattern(pos.sequence - 1)].number_of_lines
+            pos.sequence = (pos.sequence - 1 > 0 and pos.sequence - 1) or 1
+        elseif pos.line > pattn.number_of_lines then
+            pos.line = (pos.sequence == song.transport.song_length.sequence and pattn.number_of_lines) or 1
+            pos.sequence = (pos.sequence + 1 < song.transport.song_length.sequence + 1 and pos.sequence + 1)
+            or song.transport.song_length.sequence
         end
     else
         if pos.line < 1 then
             pos.line = 1
-        elseif pos.line > song.patterns[self.activePattern].number_of_lines then
-            pos.line = song.patterns[self.activePattern].number_of_lines
+        elseif pos.line > pattn.number_of_lines then
+            pos.line = pattn.number_of_lines
         end
     end
     self.editPos = pos.line
@@ -204,12 +198,12 @@ function State:setEditPos (data)
         song.transport.edit_pos = pos
     -- end
     if self.editPos == 1 then -- fix checking when song.transport.wrapped_pattern_edit is true else lights weird on crossing sequence boundaries
-        self.current[46].value = Push.light.button.off
-    elseif self.editPos == song.patterns[self.activePattern].number_of_lines then
-        self.current[47].value = Push.light.button.off
+        self.current[csr_up].value = Push.light.button.off
+    elseif self.editPos == pattn.number_of_lines then
+        self.current[csr_down].value = Push.light.button.off
     else
-        self.current[46].value = Push.light.button.low
-        self.current[47].value = Push.light.button.low
+        self.current[csr_up].value = Push.light.button.low
+        self.current[csr_down].value = Push.light.button.low
     end
     return true
 end
@@ -218,76 +212,80 @@ function State:setPlaybackPos ()
 
 end
 
-function State:setPatternDisplay (data)
-    if data[3] == 0 then return end
-    if self.activePattern == nil then return end
+function State:setPatternDisplay (data, column)
+    if data[3] == 0 or self.activePattern == nil then return end
     if self.editPos > song.patterns[self.activePattern].number_of_lines then
         print "[PushyPushPush] ERROR: Invalid Line Index for setPatternDisplay"
         return
     end
-    local note, line, sharp
-    local patt = self.activePattern
+    if not column then column = 1 end
+    local note, line, sharp, line_offset, pad_offset
+    local pattn = song.patterns[self.activePattern]
     local trk = self.activeTrack
+    local edit_colour = Push.light.pad.pale_mint_blue
+    local note_colour = Push.light.pad.super_blue
+    local sharp_note_colour = Push.light.pad.strong_purple
     for i = 36, 99 do
         i = i + 128
         if self.current[i] and self.current[i].hasLED then
             self.current[i].value = Push.light.pad.dark_grey
         end
     end
-    if song.patterns[patt].number_of_lines < 9 then
+    if pattn.number_of_lines < 9 then
         for i = 0, 7 do
-            self.current[(92 - ((self.editPos - 1) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
+            line_offset = (92 - ((self.editPos - 1) * 8)) + 128 + i
+            self.current[line_offset].value = edit_colour
         end
-        if song.patterns[patt].is_empty then return end
+        if pattn.is_empty then return end
         if song.tracks[trk].type == renoise.Track.TRACK_TYPE_MASTER
         or song.tracks[trk].type == renoise.Track.TRACK_TYPE_SEND then return end
-        for i = 1, song.patterns[patt].number_of_lines do
-            if song.patterns[patt].tracks[trk].lines[i]:note_column(1).note_string ~= "---" then
-                line = song.patterns[patt].tracks[trk].lines[i]:note_column(1)
+        for i = 1, pattn.number_of_lines do
+            if pattn.tracks[trk].lines[i]:note_column(column).note_string ~= "---" then
+                line = pattn.tracks[trk].lines[i]:note_column(column)
                 note = note_table[string.sub(line.note_string, 1, 1)]
                 sharp = string.find(line.note_string, "#")
-                self.current[(92 - ((i - 1) * 8)) + 128 + note].value = sharp and Push.light.pad.strong_purple
-                or Push.light.pad.super_blue
+                pad_offset = (92 - ((i - 1) * 8)) + 128 + note
+                self.current[pad_offset].value = sharp and sharp_note_colour or note_colour
             end
         end
     else
         for i = 0, 7 do
             if self.editPos < 5 then
-                self.current[(92 - ((self.editPos - 1) * 8)) + 128 + i].value = Push.light.pad.pale_mint_blue
-            elseif song.patterns[patt].number_of_lines > 8
-            and song.patterns[patt].number_of_lines - self.editPos < 5 then
-                self.current[
-                    (92 - ((7 - (song.patterns[patt].number_of_lines - self.editPos)) * 8)) + 128 + i
-                ].value = Push.light.pad.pale_mint_blue
+                line_offset = (92 - ((self.editPos - 1) * 8)) + 128 + i
+                self.current[line_offset].value = edit_colour
+            elseif pattn.number_of_lines > 8
+            and pattn.number_of_lines - self.editPos < 5 then
+                line_offset = (92 - ((7 - (pattn.number_of_lines - self.editPos)) * 8)) + 128 + i
+                self.current[line_offset].value = edit_colour
             else
-                self.current[68 + 128 + i].value = Push.light.pad.pale_mint_blue
+                line_offset = 68 + 128 + i
+                self.current[line_offset].value = edit_colour
             end
         end
-        if song.patterns[patt].is_empty then return end
+        if pattn.is_empty then return end
         if song.tracks[trk].type == renoise.Track.TRACK_TYPE_MASTER
         or song.tracks[trk].type == renoise.Track.TRACK_TYPE_SEND then
             return
         end
         local pos = self.editPos
-        if pos < 5 then pos = 4 elseif song.patterns[patt].number_of_lines > 8
-        and (pos > song.patterns[patt].number_of_lines - 4) then
-            pos = song.patterns[patt].number_of_lines - 4
+        if pos < 5 then pos = 4 elseif pattn.number_of_lines > 8
+        and (pos > pattn.number_of_lines - 4) then
+            pos = pattn.number_of_lines - 4
         end
         local j = 0
         for i = pos - 3, pos + 4 do
-            if song.patterns[patt].tracks[trk].lines[i] then
-                line = song.patterns[patt].tracks[trk].lines[i]:note_column(1)
+            if pattn.tracks[trk].lines[i] then
+                line = pattn.tracks[trk].lines[i]:note_column(column)
                 note = note_table[string.sub(line.note_string, 1, 1)]
                 sharp = string.find(line.note_string, "#")
             end
             if note then
-                self.current[(92 - (j * 8)) + 128 + note].value = sharp and Push.light.pad.strong_purple
-                or Push.light.pad.super_blue
+                pad_offset = (92 - (j * 8)) + 128 + note
+                self.current[pad_offset].value = sharp and sharp_note_colour or note_colour
             end
             j = j + 1
         end
     end
-
 end
 
 -- this is just for the nice touchy lights. hopefully one day it will also help playing notes into renoise
@@ -304,29 +302,29 @@ end
 
 function State:setMasterVolume (data)
     local shift_mult = (self.shiftActive and 0.1) or 1
-    local masterTrack = song.tracks[song.sequencer_track_count + 1]
-    local val = masterTrack.postfx_volume.value + ((_midi.encoderParse(data, 5) * 0.2) * shift_mult)
-    if val < masterTrack.postfx_volume.value_min then val = masterTrack.postfx_volume.value_min
-    elseif val > masterTrack.postfx_volume.value_max then val = masterTrack.postfx_volume.value_max end
-    masterTrack.postfx_volume.value = val
+    local mstr_trk = song.tracks[song.sequencer_track_count + 1]
+    local val = mstr_trk.postfx_volume.value + ((_midi.encoderParse(data, 5) * 0.2) * shift_mult)
+    if val < mstr_trk.postfx_volume.value_min then val = mstr_trk.postfx_volume.value_min
+    elseif val > mstr_trk.postfx_volume.value_max then val = mstr_trk.postfx_volume.value_max end
+    mstr_trk.postfx_volume.value = val
 end
 
 function State:setPlaying ()
-    local play = getControlFromType("name", "play")
+    local play = getControlFromType("name", "play").cc
     if song.transport.playing then
-        self.current[play.cc].value = Push.light.button.high
+        self.current[play].value = Push.light.button.high
     else
-        self.current[play.cc].value = Push.light.button.low
+        self.current[play].value = Push.light.button.low
     end
     self.dirty = true
 end
 
 function State:setEditing ()
-    local edit = getControlFromType("name", "record")
+    local edit = getControlFromType("name", "record").cc
     if song.transport.edit_mode then
-        self.current[edit.cc].value = Push.light.button.high
+        self.current[edit].value = Push.light.button.high
     else
-        self.current[edit.cc].value = Push.light.button.low
+        self.current[edit].value = Push.light.button.low
     end
     self.dirty = true
 end
@@ -346,20 +344,26 @@ function State:setActivePattern ()
     end
 end
 
+function State:setTrackDisplay ()
+    local z = 1
+    self:getTrackRange()
+    for i = self.trackRange.from, self.trackRange.to do
+        if i == self.activeTrack then
+            self.current.display.line[1].zone[z] = ">" .. song.tracks[i].name
+        else
+            self.current.display.line[1].zone[z] = song.tracks[i].name
+        end
+        z = z + 1
+    end
+end
+
 function State:setActiveTrack ()
     if self.activeTrack ~= song.selected_track_index then
         self.activeTrack = song.selected_track_index
-        -- self.current.display.line[1].zone[1] = song.tracks[self.activeTrack].name
-        local z = 1
-        self:getTrackRange()
-        for i = self.trackRange.from, self.trackRange.to do
-            if i == self.activeTrack then
-                self.current.display.line[1].zone[z] = ">" .. song.tracks[i].name
-            else
-                self.current.display.line[1].zone[z] = song.tracks[i].name
-            end
-            z = z + 1
-        end
+        self:setTrackDisplay()
+        self.current[45].value = (self.activeTrack == song.sequencer_track_count and Push.light.button.off)
+        or Push.light.button.low
+        self.current[44].value = (self.activeTrack == 1 and Push.light.button.off) or Push.light.button.low
         self:setPatternDisplay {0, 0, 1}
         self.dirty = true
     end
@@ -368,9 +372,8 @@ end
 function State:setActiveInstrument ()
     if self.activeInstrument ~= song.selected_instrument_index then
         self.activeInstrument = song.selected_instrument_index
-        self.current.display.line[2].zone[2] = (
-            song.selected_instrument.name == "" and "un-named"
-            ) or song.selected_instrument.name
+        self.current.display.line[2].zone[2] = (song.selected_instrument.name == "" and "un-named")
+        or song.selected_instrument.name
         self.dirty = true
     end
 end
@@ -379,15 +382,14 @@ function State:setOctave ()
     if self.octave ~= song.transport.octave then
         self.octave = song.transport.octave
         local cc = getControlFromType("name", "oct_down").cc
-        -- this bit with the lights is wrong
         if self.octave % 8 == 0 then
             if self.octave == 8 then
                 cc = cc + 1
             end
             self.current[cc].value = Push.light.button.off
         else
-            self.current[cc].value = Push.light.button.high
-            self.current[cc + 1].value = Push.light.button.high
+            self.current[cc].value = Push.light.button.low
+            self.current[cc + 1].value = Push.light.button.low
         end
     end
     self.dirty = true
@@ -486,9 +488,6 @@ function State:changeTrack (data)
             song:select_previous_track()
         end
     end
-    self.current[45].value = (self.activeTrack == (song.sequencer_track_count)
-    and Push.light.button.off) or Push.light.button.low
-    self.current[44].value = (self.activeTrack == 1 and Push.light.button.off) or Push.light.button.low
 end
 
 function State:changeInstrument (data)
@@ -521,10 +520,9 @@ function State:changeOctave (data)
     end
     song.transport.octave = octave
 end
-
+--[==[
 function State:setSharp (data) -- this is probably now redundant and can be removed...
-    if data[3] == 0 then return end
-    if not song.transport.edit_mode then return false end
+    if data[3] == 0 or not song.transport.edit_mode then return false end
     local note, line, sharp, no_funny_business
     local pattn = song.patterns[self.activePattern]
     local trk = self.activeTrack
@@ -577,8 +575,8 @@ function State:setSharp (data) -- this is probably now redundant and can be remo
         self.current[data[2]].value = Push.light.note_val.off
     end
 end
-
-function State:insertNote (data)
+--]==]
+function State:insertNote (data, column)
     --renoise note value 0 = C-0 119, = B-9
     local trk = self.activeTrack
     if data[3] == 0
@@ -587,6 +585,7 @@ function State:insertNote (data)
     or not song.transport.edit_mode then
         return false
     end
+    if not column then column = 1 end
     local note, line, basic, n_str, o_str
     local sharp = "-"
     local pattn = song.patterns[self.activePattern]
@@ -611,7 +610,7 @@ function State:insertNote (data)
             line = line - 3
         end
     end
-    o_str = pattn.tracks[trk].lines[line].note_columns[1].note_string
+    o_str = pattn.tracks[trk].lines[line]:note_column(column).note_string
     if o_str == "---" then
         o_str = "%-%-%-"
     else
@@ -619,21 +618,21 @@ function State:insertNote (data)
     end
     if not basic then line = self.editPos + line end
     if note == "OFF" then
-        if note == pattn.tracks[trk].lines[line].note_columns[1].note_string then
-            pattn.tracks[trk].lines[line].note_columns[1].note_string = "---"
-            pattn.tracks[trk].lines[line].note_columns[1].instrument_value = 255
+        if note == pattn.tracks[trk].lines[line]:note_column(column).note_string then
+            pattn.tracks[trk].lines[line]:note_column(column).note_string = "---"
+            pattn.tracks[trk].lines[line]:note_column(column).instrument_value = 255
         else
-            pattn.tracks[trk].lines[line].note_columns[1].note_string = note
-            pattn.tracks[trk].lines[line].note_columns[1].instrument_value = self.activeInstrument - 1
+            pattn.tracks[trk].lines[line]:note_column(column).note_string = note
+            pattn.tracks[trk].lines[line]:note_column(column).instrument_value = self.activeInstrument - 1
         end
     elseif note then
         n_str = note .. sharp .. self.octave
         if string.find(n_str, o_str) then
-            pattn.tracks[trk].lines[line].note_columns[1].note_string = "---"
-            pattn.tracks[trk].lines[line].note_columns[1].instrument_value = 255
+            pattn.tracks[trk].lines[line]:note_column(column).note_string = "---"
+            pattn.tracks[trk].lines[line]:note_column(column).instrument_value = 255
         else
-            pattn.tracks[trk].lines[line].note_columns[1].note_string = n_str
-            pattn.tracks[trk].lines[line].note_columns[1].instrument_value = self.activeInstrument - 1
+            pattn.tracks[trk].lines[line]:note_column(column).note_string = n_str
+            pattn.tracks[trk].lines[line]:note_column(column).instrument_value = self.activeInstrument - 1
         end
     end
     return true

@@ -156,10 +156,6 @@ local sequencer = {
                 }
                 return lights
             end,
-            -- using direct reference to global push object below here. this is not ideal, but is done to make scope issues go
-            -- away ASAP. Need to determine another way to free the declarations from being tied to a specific variable.
-            -- Eventual intention is for the mode spec to be simple key-value pair style statements which are compiled into
-            -- a callable function similar to the one below, but without necessity to write lots of conditionals etc.
             display = function ()
                 local display = table.copy(Push.display)
                 local z = 1
