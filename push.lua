@@ -5,7 +5,8 @@ function Push:__init ()
     self._mode = Mode()
     self._midi = Midi()
     self:setRefs()
-    self.device_name = nil
+    self.input_device_name = nil
+    self.output_device_name = nil
     self.output = nil
     self.input = nil
     self.encoderStream = {}
@@ -414,7 +415,7 @@ Push.display = {
         }
     }
 
-local device_by_platform = { WINDOWS = "midiin2%s*%(ableton%s*push%)%s*%d*", MACINTOSH = "ableton push %(user port%)", LINUX = "ableton push%s*%d*:1" }
+local device_by_platform = { WINDOWS = "%(?%w+%s*%(ableton%s*push%)%s*%d*", MACINTOSH = "ableton push %(user port%)", LINUX = "ableton push%s*%d*:1" }
 
 local sysex_id_pattern = {
     "240", "126", "%d+",  "6",  "2",  "71", "21", "0",
@@ -433,20 +434,29 @@ end
 
 function Push:findDeviceByName()
     local name
+    for _, device in ipairs(renoise.Midi.available_input_devices()) do
+        name = string.find(string.lower(device), device_by_platform[os.platform()])
+        if name then
+            self.input_device_name = device
+            name = nil
+            break
+        end
+    end
     for _, device in ipairs(renoise.Midi.available_output_devices()) do
         name = string.find(string.lower(device), device_by_platform[os.platform()])
         if name then
-            self.device_name = device
+            self.output_device_name = device
             return true
         end
     end
 --unable to find a Push
-    self.device_name = nil
+    self.input_device_name = nil
+    self.output_device_name = nil
     return false
 end
 
 function Push:findDeviceBySysex()
-    local t_input, t_output, id = {}
+    local t_input, t_output, id
     for i, device in ipairs(renoise.Midi.available_input_devices()) do
         t_input[i] = renoise.Midi.create_input_device(device, nil,
             function (reply)
@@ -457,9 +467,9 @@ function Push:findDeviceBySysex()
                         return -- exit if we hit a non-match
                     end
                 end
-                id = renoise.Midi.available_input_devices()[i+1] -- this is a kludge to get the User port. There is no guarantee that the Live port will be registered and discovered first, it is only assumed to be the case.
-                if not string.find(string.lower(id), "ableton") then id = nil; t_input[i]:close() return end -- check to see we aren't getting wrong device
-                print("[PushyPushPush]: Found device", id)
+                id = { input = renoise.Midi.available_input_devices()[i+1] }-- this is a kludge to get the User port. There is no guarantee that the Live port will be registered and discovered first, it is only assumed to be the case.
+                if not string.find(string.lower(id.input), "ableton") then id = nil; t_input[i]:close() return end -- check to see we aren't getting wrong device
+                print("[PushyPushPush]: Found device", id.input)
                 t_input[i]:close()
             end
         )
@@ -469,7 +479,7 @@ function Push:findDeviceBySysex()
         t_output:send(Midi.sysex.id_request)
         t_output:close()
     end
-    if id then self.device_name = id return true else return false end
+    if id then self.input_device_name = id.input return true else return false end
 end
 
 function Push:watchMidiDevices()
@@ -481,7 +491,7 @@ end
 
 function Push:open (scan_func)
     if scan_func(self) then
-        if not table.find(renoise.Midi.available_output_devices(), self.device_name) then
+        if not table.find(renoise.Midi.available_output_devices(), self.output_device_name) then
             return false
         end
 
@@ -490,7 +500,7 @@ function Push:open (scan_func)
             print "[PushyPushPush]: Output already open. Closing output"
         end
 
-        self.output = renoise.Midi.create_output_device(self.device_name)
+        self.output = renoise.Midi.create_output_device(self.output_device_name)
         print("[PushyPushPush]: Opening output", self.output.name)
 
         if self.input and self.input.is_open then
@@ -498,7 +508,7 @@ function Push:open (scan_func)
             print "[PushyPushPush]: Input already open. Closing input"
         end
 
-        self.input = renoise.Midi.create_input_device(self.device_name, Midi.handleMidi)
+        self.input = renoise.Midi.create_input_device(self.input_device_name, Midi.handleMidi)
         print("[PushyPushPush]: Opening input", self.input.name)
 
         self._midi.sendMidi(Midi.sysex.user_mode)

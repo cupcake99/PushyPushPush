@@ -14,7 +14,7 @@ local function letsGo ()
     require "mode"
     require "midi"
     if not push then push = Push() end
-    push:start(1)
+    push:start(os.platform() ~= "WINDOWS")
 end
 
 local function goodnight ()
