@@ -456,7 +456,7 @@ function Push:findDeviceByName()
 end
 
 function Push:findDeviceBySysex()
-    local t_input, t_output, id
+    local t_input, t_output, id = {}
     for i, device in ipairs(renoise.Midi.available_input_devices()) do
         t_input[i] = renoise.Midi.create_input_device(device, nil,
             function (reply)
