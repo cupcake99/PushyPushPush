@@ -5,8 +5,8 @@ function Push:__init ()
     self._mode = Mode()
     self._midi = Midi()
     self:setRefs()
-    self.input_device_name = nil
-    self.output_device_name = nil
+    self.input_device_name = (config.prefs.input_device.value ~= "" and config.prefs.input_device.value) or nil
+    self.output_device_name = (config.prefs.output_device.value ~= "" and config.prefs.output_device.value) or nil
     self.output = nil
     self.input = nil
     self.encoderStream = {}
@@ -433,6 +433,7 @@ function Push:setRefs ()
 end
 
 function Push:findDeviceByName()
+    print "name"
     local name
     for _, device in ipairs(renoise.Midi.available_input_devices()) do
         name = string.find(string.lower(device), device_by_platform[os.platform()])
@@ -455,7 +456,8 @@ function Push:findDeviceByName()
     return false
 end
 
-function Push:findDeviceBySysex()
+function Push:findDeviceBySysex() --this method will always fail at present as it doesn't have a way of picking the correct output device and assigning the name
+    print "sysex"
     local t_input, t_output, id = {}
     for i, device in ipairs(renoise.Midi.available_input_devices()) do
         t_input[i] = renoise.Midi.create_input_device(device, nil,
@@ -479,8 +481,19 @@ function Push:findDeviceBySysex()
         t_output:send(Midi.sysex.id_request)
         t_output:close()
     end
-    if id then self.input_device_name = id.input return true else return false end
+    if id and id.input and id.output then
+        self.input_device_name = id.input
+        self.output_device_name = id.output
+        return true
+    else
+        return false
+    end
 end
+
+local scanner = {
+    name = Push.findDeviceByName,
+    sysex = Push.findDeviceBySysex
+}
 
 function Push:watchMidiDevices()
     if not self:findDeviceByName() then
@@ -490,32 +503,40 @@ function Push:watchMidiDevices()
 end
 
 function Push:open (scan_func)
-    if scan_func(self) then
-        if not table.find(renoise.Midi.available_output_devices(), self.output_device_name) then
+    scan_func = scan_func or Push.findDeviceByName
+    local do_scan
+    if self.input_device_name and self.output_device_name then do_scan = false else do_scan = true end
+    if do_scan then
+        if not scan_func(self) then
             return false
         end
-
-        if self.output and self.output.is_open then
-            self.output:close()
-            print "[PushyPushPush]: Output already open. Closing output"
-        end
-
-        self.output = renoise.Midi.create_output_device(self.output_device_name)
-        print("[PushyPushPush]: Opening output", self.output.name)
-
-        if self.input and self.input.is_open then
-            self.input:close()
-            print "[PushyPushPush]: Input already open. Closing input"
-        end
-
-        self.input = renoise.Midi.create_input_device(self.input_device_name, Midi.handleMidi)
-        print("[PushyPushPush]: Opening input", self.input.name)
-
-        self._midi.sendMidi(Midi.sysex.user_mode)
-
-        return true
     end
-    return false
+    if not table.find(renoise.Midi.available_output_devices(), self.output_device_name) then
+        return false
+    end
+
+    if self.output and self.output.is_open then
+        self.output:close()
+        print "[PushyPushPush]: Output already open. Closing output"
+    end
+
+    self.output = renoise.Midi.create_output_device(self.output_device_name)
+    print("[PushyPushPush]: Opening output", self.output.name)
+
+    if self.input and self.input.is_open then
+        self.input:close()
+        print "[PushyPushPush]: Input already open. Closing input"
+    end
+
+    self.input = renoise.Midi.create_input_device(self.input_device_name, Midi.handleMidi)
+    print("[PushyPushPush]: Opening input", self.input.name)
+
+    self._midi.sendMidi(Midi.sysex.user_mode)
+    --possibly move the saving of device names elsewhere to be sure Push has been correctly identified
+    config.prefs.input_device.value = self.input_device_name
+    config.prefs.output_device.value = self.output_device_name
+
+    return true
 end
 
 function Push:close ()
@@ -529,9 +550,9 @@ function Push:close ()
     end
 end
 
-function Push:start (manual)
-    local scan_func = Push.findDeviceBySysex
-    if not manual then scan_func = Push.findDeviceByName end -- if called by a notifier set correct scanner function
+function Push:start (how)
+    if not how then how = "name" end
+    local scan_func = scanner[how]
     if not self:open(scan_func) then
         print "[PushyPushPush]: Cannot find Ableton Push device"
         if not tool:has_timer {self, Push.start} then

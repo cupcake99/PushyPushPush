@@ -4,6 +4,7 @@ _OSC = false
 tool = renoise.tool()
 song = nil
 push = nil
+config = require "config"
 
 local function letsGo ()
     if not song then song = renoise.song() end
@@ -14,7 +15,14 @@ local function letsGo ()
     require "mode"
     require "midi"
     if not push then push = Push() end
-    push:start(os.platform() ~= "WINDOWS")
+    config.getPush(push)
+    if config.prefs.autostart.value then
+        local scanner = "sysex"
+        if os.platform() == "WINDOWS" then
+            scanner = "name"
+        end
+        push:start(scanner)
+    end
 end
 
 local function goodnight ()
